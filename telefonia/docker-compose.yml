@@ -1,0 +1,10 @@
+# Asterisk local para el demo de llamadas por app (Linphone).
+# Usa la red del equipo (Linux) para que el audio RTP llegue sin NAT.
+services:
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: compania-asterisk
+    network_mode: host
+    volumes:
+      - ./asterisk:/etc/asterisk
+    restart: unless-stopped

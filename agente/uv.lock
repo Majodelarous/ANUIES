@@ -687,6 +687,9 @@ nova = [
     { name = "boto3" },
     { name = "pipecat-ai", extra = ["aws-nova-sonic"] },
 ]
+telefonia = [
+    { name = "pipecat-asterisk" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -701,9 +704,10 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'nova'", specifier = ">=1.35" },
     { name = "pipecat-ai", extras = ["aws-nova-sonic"], marker = "extra == 'nova'", specifier = ">=1.15,<2" },
     { name = "pipecat-ai", extras = ["google", "runner", "silero", "webrtc", "websocket"], specifier = ">=1.15,<2" },
+    { name = "pipecat-asterisk", marker = "extra == 'telefonia'", specifier = ">=0.1.4,<0.2" },
     { name = "python-dotenv", specifier = ">=1.0" },
 ]
-provides-extras = ["nova"]
+provides-extras = ["nova", "telefonia"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2509,6 +2513,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d4/50/7ad21080c8c8d6210b08c6f2b72f9939da71caa2f8c3f16ac4afd9af25e8/pipecat_ai_prebuilt-1.3.0.tar.gz", hash = "sha256:b7ee2244e6885f2866272d4f4c5053980b1a1fcfc8c8976b6a21e6558676b061", size = 825709, upload-time = "2026-10-02T13:06:10.876Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e4/6a/df44efb2952089e59a7a2e1798156666257429613d6feac6f1ebb364f420/pipecat_ai_prebuilt-1.3.0-py3-none-any.whl", hash = "sha256:fe06408efea390d0cfe4257b4bf86aff19b44189cdbb504954dd9329513dbf7f", size = 828361, upload-time = "2026-10-02T13:06:09.099Z" },
+]
+
+[[package]]
+name = "pipecat-asterisk"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "pipecat-ai" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/b1/9962c87528ede26eb9b9886eb5019e0312344cb516f0f786925a6e230139/pipecat_asterisk-0.1.4.tar.gz", hash = "sha256:5107b5492d24803aaad3f03a549f81735f98c9adadf778413897c24c25e646bd", size = 16255, upload-time = "2026-09-09T21:38:47.278Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/a2/c5becc81625c50d01589d8763610e67b53777a34da012aa737fc9269c115/pipecat_asterisk-0.1.4-py3-none-any.whl", hash = "sha256:dc8c96d98d1f0af6451980e9468a878ec7c3dd609220856ee9982578a806fc38", size = 21623, upload-time = "2026-09-09T21:38:46.047Z" },
 ]
 
 [[package]]

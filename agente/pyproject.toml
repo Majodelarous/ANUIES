@@ -10,12 +10,15 @@ dependencies = [
 
 [project.optional-dependencies]
 nova = ["pipecat-ai[aws-nova-sonic]>=1.15,<2", "boto3>=1.35"]
+telefonia = ["pipecat-asterisk>=0.1.4,<0.2"]
 
 [project.scripts]
 compania-bot = "compania.agente.bot:main"
 compania-semilla = "compania.agente.semilla:main"
 compania-panel = "compania.panel.app:main"
 compania-llamar = "compania.agente.llamar:main"
+compania-asterisk = "compania.agente.asterisk:main"
+compania-llamar-app = "compania.agente.asterisk:llamar"
 
 [dependency-groups]
 dev = [
