@@ -1,0 +1,323 @@
+"""Repositorio SQLite del prototipo."""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from compania.dominio.modelos import (
+    Alerta,
+    Llamada,
+    MensajeFamiliar,
+    NivelAlerta,
+    Persona,
+    Recordatorio,
+    Recuerdo,
+    RespuestaBienestar,
+)
+
+ESQUEMA = """
+CREATE TABLE IF NOT EXISTS personas (
+    id INTEGER PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    trato TEXT NOT NULL,
+    contacto_emergencia TEXT
+);
+CREATE TABLE IF NOT EXISTS recuerdos (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    tema TEXT NOT NULL,
+    contenido TEXT NOT NULL,
+    compartir_con_familia INTEGER NOT NULL DEFAULT 0,
+    creado TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS respuestas_bienestar (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    pregunta_id TEXT NOT NULL,
+    respuesta TEXT NOT NULL,
+    creado TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS recordatorios (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    texto TEXT NOT NULL,
+    hora TEXT NOT NULL,
+    creado_por TEXT NOT NULL,
+    activo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS mensajes_familia (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    de TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    audio TEXT,
+    entregado INTEGER NOT NULL DEFAULT 0,
+    creado TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS alertas (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    nivel TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    creado TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS llamadas (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    canal TEXT NOT NULL,
+    inicio TEXT NOT NULL,
+    fin TEXT
+);
+CREATE TABLE IF NOT EXISTS resultados_juego (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    juego_id TEXT NOT NULL,
+    acerto INTEGER NOT NULL,
+    creado TEXT NOT NULL
+);
+"""
+
+
+def _fecha(valor: str | None) -> datetime | None:
+    return datetime.fromisoformat(valor) if valor else None
+
+
+class Repositorio:
+    """Acceso a datos con SQLite. Una instancia por proceso."""
+
+    def __init__(self, ruta: str | Path = "compania.db") -> None:
+        self._db = sqlite3.connect(str(ruta), check_same_thread=False)
+        self._db.row_factory = sqlite3.Row
+        self._db.executescript(ESQUEMA)
+        self._db.commit()
+
+    def cerrar(self) -> None:
+        self._db.close()
+
+    def _insertar(self, sql: str, valores: tuple) -> int:
+        cur = self._db.execute(sql, valores)
+        self._db.commit()
+        return int(cur.lastrowid)
+
+    # Personas
+
+    def guardar_persona(self, persona: Persona) -> Persona:
+        persona.id = self._insertar(
+            "INSERT INTO personas (nombre, trato, contacto_emergencia) VALUES (?, ?, ?)",
+            (persona.nombre, persona.trato, persona.contacto_emergencia),
+        )
+        return persona
+
+    def obtener_persona(self, persona_id: int) -> Persona | None:
+        fila = self._db.execute("SELECT * FROM personas WHERE id = ?", (persona_id,)).fetchone()
+        if not fila:
+            return None
+        return Persona(fila["nombre"], fila["trato"], fila["contacto_emergencia"], fila["id"])
+
+    def primera_persona(self) -> Persona | None:
+        fila = self._db.execute("SELECT id FROM personas ORDER BY id LIMIT 1").fetchone()
+        return self.obtener_persona(fila["id"]) if fila else None
+
+    # Recuerdos
+
+    def guardar_recuerdo(self, recuerdo: Recuerdo) -> Recuerdo:
+        recuerdo.id = self._insertar(
+            "INSERT INTO recuerdos (persona_id, tema, contenido, compartir_con_familia, creado)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                recuerdo.persona_id,
+                recuerdo.tema,
+                recuerdo.contenido,
+                int(recuerdo.compartir_con_familia),
+                recuerdo.creado.isoformat(),
+            ),
+        )
+        return recuerdo
+
+    def buscar_recuerdos(self, persona_id: int, tema: str | None = None, limite: int = 5) -> list[Recuerdo]:
+        sql = "SELECT * FROM recuerdos WHERE persona_id = ?"
+        valores: list = [persona_id]
+        if tema:
+            sql += " AND (tema LIKE ? OR contenido LIKE ?)"
+            valores += [f"%{tema}%", f"%{tema}%"]
+        sql += " ORDER BY creado DESC, id DESC LIMIT ?"
+        valores.append(limite)
+        return [
+            Recuerdo(
+                f["persona_id"],
+                f["tema"],
+                f["contenido"],
+                bool(f["compartir_con_familia"]),
+                datetime.fromisoformat(f["creado"]),
+                f["id"],
+            )
+            for f in self._db.execute(sql, valores).fetchall()
+        ]
+
+    # Bienestar
+
+    def guardar_respuesta(self, respuesta: RespuestaBienestar) -> RespuestaBienestar:
+        respuesta.id = self._insertar(
+            "INSERT INTO respuestas_bienestar (persona_id, pregunta_id, respuesta, creado)"
+            " VALUES (?, ?, ?, ?)",
+            (
+                respuesta.persona_id,
+                respuesta.pregunta_id,
+                respuesta.respuesta,
+                respuesta.creado.isoformat(),
+            ),
+        )
+        return respuesta
+
+    def respuestas(self, persona_id: int, desde: datetime | None = None) -> list[RespuestaBienestar]:
+        desde = desde or datetime.now() - timedelta(days=30)
+        filas = self._db.execute(
+            "SELECT * FROM respuestas_bienestar WHERE persona_id = ? AND creado >= ? ORDER BY creado",
+            (persona_id, desde.isoformat()),
+        ).fetchall()
+        return [
+            RespuestaBienestar(
+                f["persona_id"],
+                f["pregunta_id"],
+                f["respuesta"],
+                datetime.fromisoformat(f["creado"]),
+                f["id"],
+            )
+            for f in filas
+        ]
+
+    # Recordatorios
+
+    def guardar_recordatorio(self, recordatorio: Recordatorio) -> Recordatorio:
+        recordatorio.id = self._insertar(
+            "INSERT INTO recordatorios (persona_id, texto, hora, creado_por, activo) VALUES (?, ?, ?, ?, ?)",
+            (
+                recordatorio.persona_id,
+                recordatorio.texto,
+                recordatorio.hora,
+                recordatorio.creado_por,
+                int(recordatorio.activo),
+            ),
+        )
+        return recordatorio
+
+    def recordatorios_activos(self, persona_id: int) -> list[Recordatorio]:
+        filas = self._db.execute(
+            "SELECT * FROM recordatorios WHERE persona_id = ? AND activo = 1 ORDER BY hora",
+            (persona_id,),
+        ).fetchall()
+        return [
+            Recordatorio(f["persona_id"], f["texto"], f["hora"], f["creado_por"], bool(f["activo"]), f["id"])
+            for f in filas
+        ]
+
+    # Mensajes de la familia
+
+    def guardar_mensaje(self, mensaje: MensajeFamiliar) -> MensajeFamiliar:
+        mensaje.id = self._insertar(
+            "INSERT INTO mensajes_familia (persona_id, de, texto, audio, entregado, creado)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                mensaje.persona_id,
+                mensaje.de,
+                mensaje.texto,
+                mensaje.audio,
+                int(mensaje.entregado),
+                mensaje.creado.isoformat(),
+            ),
+        )
+        return mensaje
+
+    def mensajes_pendientes(self, persona_id: int) -> list[MensajeFamiliar]:
+        filas = self._db.execute(
+            "SELECT * FROM mensajes_familia WHERE persona_id = ? AND entregado = 0 ORDER BY creado",
+            (persona_id,),
+        ).fetchall()
+        return [
+            MensajeFamiliar(
+                f["persona_id"],
+                f["de"],
+                f["texto"],
+                f["audio"],
+                bool(f["entregado"]),
+                datetime.fromisoformat(f["creado"]),
+                f["id"],
+            )
+            for f in filas
+        ]
+
+    def marcar_entregado(self, mensaje_id: int, persona_id: int) -> bool:
+        cur = self._db.execute(
+            "UPDATE mensajes_familia SET entregado = 1 WHERE id = ? AND persona_id = ?",
+            (mensaje_id, persona_id),
+        )
+        self._db.commit()
+        return cur.rowcount == 1
+
+    # Alertas
+
+    def guardar_alerta(self, alerta: Alerta) -> Alerta:
+        alerta.id = self._insertar(
+            "INSERT INTO alertas (persona_id, nivel, motivo, creado) VALUES (?, ?, ?, ?)",
+            (alerta.persona_id, alerta.nivel.value, alerta.motivo, alerta.creado.isoformat()),
+        )
+        return alerta
+
+    def alertas(self, persona_id: int, desde: datetime | None = None) -> list[Alerta]:
+        desde = desde or datetime.now() - timedelta(days=30)
+        filas = self._db.execute(
+            "SELECT * FROM alertas WHERE persona_id = ? AND creado >= ? ORDER BY creado",
+            (persona_id, desde.isoformat()),
+        ).fetchall()
+        return [
+            Alerta(
+                f["persona_id"],
+                NivelAlerta(f["nivel"]),
+                f["motivo"],
+                datetime.fromisoformat(f["creado"]),
+                f["id"],
+            )
+            for f in filas
+        ]
+
+    # Llamadas
+
+    def iniciar_llamada(self, persona_id: int, canal: str) -> Llamada:
+        llamada = Llamada(persona_id, canal)
+        llamada.id = self._insertar(
+            "INSERT INTO llamadas (persona_id, canal, inicio) VALUES (?, ?, ?)",
+            (persona_id, canal, llamada.inicio.isoformat()),
+        )
+        return llamada
+
+    def terminar_llamada(self, llamada_id: int) -> None:
+        self._db.execute("UPDATE llamadas SET fin = ? WHERE id = ?", (datetime.now().isoformat(), llamada_id))
+        self._db.commit()
+
+    def llamadas(self, persona_id: int, limite: int = 20) -> list[Llamada]:
+        filas = self._db.execute(
+            "SELECT * FROM llamadas WHERE persona_id = ? ORDER BY inicio DESC LIMIT ?",
+            (persona_id, limite),
+        ).fetchall()
+        return [
+            Llamada(
+                f["persona_id"], f["canal"], datetime.fromisoformat(f["inicio"]), _fecha(f["fin"]), f["id"]
+            )
+            for f in filas
+        ]
+
+    def es_primera_llamada(self, persona_id: int) -> bool:
+        fila = self._db.execute(
+            "SELECT COUNT(*) AS n FROM llamadas WHERE persona_id = ?", (persona_id,)
+        ).fetchone()
+        return fila["n"] <= 1
+
+    # Juegos
+
+    def guardar_resultado_juego(self, persona_id: int, juego_id: str, acerto: bool) -> None:
+        self._insertar(
+            "INSERT INTO resultados_juego (persona_id, juego_id, acerto, creado) VALUES (?, ?, ?, ?)",
+            (persona_id, juego_id, int(acerto), datetime.now().isoformat()),
+        )
