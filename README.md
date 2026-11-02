@@ -57,6 +57,8 @@ uv run compania-llamar --a +52XXXXXXXXXX --host <dominio-ngrok>
 
 Con cuenta de prueba de Twilio solo se puede llamar a números verificados en la consola, y la llamada inicia con un aviso de cuenta de prueba.
 
+Para llamar por app sin operador telefónico (Asterisk + Linphone), ver `telefonia/README.md`.
+
 ## Principios
 
 Ver `docs/constitucion.md`. En resumen: la asistente siempre dice que es una asistente, no diagnostica, promueve el contacto con personas, pide consentimiento por escrito para datos de salud y nunca usa voces de personas fallecidas.
