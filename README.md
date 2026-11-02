@@ -44,6 +44,7 @@ uv sync
 uv run pytest               # pruebas
 uv run compania-semilla --nombre "Carmen" --trato "doña Carmen"
 uv run compania-bot         # abre http://localhost:7860/client en el navegador
+uv run compania-panel       # panel familiar en http://localhost:7861
 ```
 
 Para llamadas telefónicas con Twilio:

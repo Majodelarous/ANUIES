@@ -8,14 +8,14 @@
 - [x] T04 Instrucciones del sistema construidas con perfil, recuerdos, recordatorios, mensajes y preguntas del día (HU-01, HU-02, HU-05)
 - [x] T05 Herramientas del agente con pruebas (HU-02 a HU-06)
 - [x] T06 Bot de voz con Gemini Live o Nova Sonic, canales WebRTC y Twilio, registro de llamadas (HU-01)
-- [ ] T07 Prueba con llave real: conversación en navegador y elección de voz en español
+- [x] T07 Prueba real en navegador con Nova Sonic (voz lupe); Gemini Live verificado con llave gratuita
 - [ ] T08 Comparar Gemini Live y Nova Sonic con la misma conversación (naturalidad, comprensión, latencia)
 - [ ] T09 Llamada telefónica real con Twilio a un número verificado
 
 ## Iteración 2: familia y voz familiar
 
-- [ ] T10 Panel familiar web: llamadas, señal de bienestar, recordatorios, recuerdos compartidos, alertas (HU-07)
-- [ ] T11 Alta de recordatorios y mensajes desde el panel (HU-05)
+- [x] T10 Panel familiar web: llamadas, señal de bienestar, recordatorios, recuerdos compartidos, alertas (HU-07)
+- [x] T11 Alta de recordatorios y mensajes desde el panel (HU-05)
 - [ ] T12 Mensaje con audio de voz familiar consentida y reproducción dentro de la llamada (HU-05.3)
 - [ ] T13 Ajuste de ritmo, silencios y vocabulario con pruebas con la persona real
 
