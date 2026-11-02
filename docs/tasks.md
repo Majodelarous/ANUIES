@@ -10,7 +10,7 @@
 - [x] T06 Bot de voz con Gemini Live o Nova Sonic, canales WebRTC y Twilio, registro de llamadas (HU-01)
 - [x] T07 Prueba real en navegador con Nova Sonic (voz lupe); Gemini Live verificado con llave gratuita
 - [ ] T08 Comparar Gemini Live y Nova Sonic con la misma conversación (naturalidad, comprensión, latencia)
-- [ ] T09 Llamada telefónica real con Twilio a un número verificado (script de llamada saliente listo; falta número de Twilio y número verificado)
+- [ ] T09 Llamada telefónica real con Twilio (bloqueado: la cuenta de prueba de Twilio no permite `<Stream>`; requiere cuenta pagada)
 
 ## Iteración 2: familia y voz familiar
 
