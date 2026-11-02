@@ -38,6 +38,33 @@ load_dotenv(override=True)
 SALUDO = "Inicia la llamada saludando a la persona como indican tus instrucciones."
 
 
+def credenciales_aws() -> dict[str, str | None]:
+    """Credenciales de AWS desde variables de entorno o desde el perfil ``AWS_PROFILE``."""
+    region = os.getenv("AWS_REGION") or "us-east-1"
+    if os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"):
+        return {
+            "access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
+            "secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
+            "session_token": os.getenv("AWS_SESSION_TOKEN") or None,
+            "region": region,
+        }
+
+    import boto3
+
+    perfil = os.getenv("AWS_PROFILE") or None
+    sesion = boto3.Session(profile_name=perfil)
+    actuales = sesion.get_credentials()
+    if actuales is None:
+        raise RuntimeError(f"No se encontraron credenciales de AWS para el perfil {perfil!r}")
+    congeladas = actuales.get_frozen_credentials()
+    return {
+        "access_key_id": congeladas.access_key,
+        "secret_access_key": congeladas.secret_key,
+        "session_token": congeladas.token,
+        "region": os.getenv("AWS_REGION") or sesion.region_name or region,
+    }
+
+
 def crear_servicio_voz(instrucciones: str, herramientas: list):
     """Crea el servicio de voz a voz según ``MOTOR_VOZ`` (gemini o nova)."""
     motor = os.getenv("MOTOR_VOZ", "gemini").lower()
@@ -46,13 +73,13 @@ def crear_servicio_voz(instrucciones: str, herramientas: list):
         from pipecat.services.aws.nova_sonic.llm import AWSNovaSonicLLMService
 
         ajustes_nova = AWSNovaSonicLLMService.Settings(system_instruction=instrucciones)
-        if os.getenv("NOVA_VOICE_ID"):
-            ajustes_nova.voice = os.environ["NOVA_VOICE_ID"]
+        ajustes_nova.voice = os.getenv("NOVA_VOICE_ID") or "lupe"
+        credenciales = credenciales_aws()
         return AWSNovaSonicLLMService(
-            access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-            secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-            session_token=os.getenv("AWS_SESSION_TOKEN") or None,
-            region=os.getenv("AWS_REGION", "us-east-1"),
+            access_key_id=credenciales["access_key_id"],
+            secret_access_key=credenciales["secret_access_key"],
+            session_token=credenciales["session_token"],
+            region=credenciales["region"],
             settings=ajustes_nova,
             tools=herramientas,
         )
