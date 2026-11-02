@@ -101,14 +101,22 @@ def _canal(runner_args: RunnerArguments) -> str:
     return "web" if isinstance(runner_args, SmallWebRTCRunnerArguments) else "telefono"
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> None:
+async def run_bot(
+    transport: BaseTransport,
+    runner_args: RunnerArguments | None = None,
+    *,
+    canal: str | None = None,
+    frecuencia_audio: int | None = None,
+) -> None:
+    """Corre una llamada. ``canal``: web, telefono o app; si falta se deduce de ``runner_args``."""
     repo = Repositorio(os.getenv("RUTA_DB", "compania.db"))
     persona_id = os.getenv("PERSONA_ID")
     persona = repo.obtener_persona(int(persona_id)) if persona_id else repo.primera_persona()
     if persona is None or persona.id is None:
         raise RuntimeError("No hay persona registrada. Ejecuta: uv run compania-semilla --help")
 
-    llamada = repo.iniciar_llamada(persona.id, _canal(runner_args))
+    canal = canal or (_canal(runner_args) if runner_args else "telefono")
+    llamada = repo.iniciar_llamada(persona.id, canal)
     respuestas = repo.respuestas(persona.id)
     instrucciones = construir_instrucciones(
         persona,
@@ -128,8 +136,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
     pipeline = Pipeline([transport.input(), user_aggregator, llm, transport.output(), assistant_aggregator])
-    worker = PipelineWorker(pipeline, params=PipelineParams(enable_metrics=True, enable_usage_metrics=True))
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    frecuencias = (
+        {"audio_in_sample_rate": frecuencia_audio, "audio_out_sample_rate": frecuencia_audio}
+        if frecuencia_audio
+        else {}
+    )
+    parametros = PipelineParams(enable_metrics=True, enable_usage_metrics=True, **frecuencias)
+    worker = PipelineWorker(pipeline, params=parametros)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint if runner_args else False)
     await runner.add_workers(worker)
 
     async def iniciar_conversacion() -> None:

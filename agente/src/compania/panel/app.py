@@ -38,6 +38,8 @@ TEXTO_SEMAFORO = {
     ),
 }
 
+NOMBRE_CANAL = {"telefono": "Teléfono", "app": "Llamada por app", "web": "Navegador"}
+
 NOMBRE_NIVEL = {
     NivelAlerta.INFORMATIVA: "Informativa",
     NivelAlerta.ATENCION: "Atención",
@@ -160,7 +162,7 @@ def pagina(datos: dict) -> str:
 
     filas_llamadas = (
         "".join(
-            f"<tr><td>{_fecha_corta(ll.inicio)}</td><td>{'Teléfono' if ll.canal == 'telefono' else 'Navegador'}</td>"
+            f"<tr><td>{_fecha_corta(ll.inicio)}</td><td>{NOMBRE_CANAL.get(ll.canal, ll.canal)}</td>"
             f'<td class="num">{_duracion(ll.inicio, ll.fin)}</td></tr>'
             for ll in datos["llamadas"][:10]
         )
