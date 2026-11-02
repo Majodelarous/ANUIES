@@ -17,7 +17,6 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from xml.sax.saxutils import quoteattr
 
 from dotenv import load_dotenv
 
@@ -25,13 +24,15 @@ E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 API = "https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json"
 
 
-def twiml_stream(host: str) -> str:
-    """TwiML que conecta la llamada con el websocket del bot."""
+def url_webhook(host: str) -> str:
+    """URL del bot que responde a Twilio con las instrucciones para conectar el audio.
+
+    El runner de Pipecat, iniciado con ``-t twilio -x <host>``, responde en ``POST /`` con
+    TwiML que abre el websocket ``wss://<host>/ws``. Se usa ``Url`` y no TwiML en línea
+    porque las cuentas de prueba de Twilio no aceptan el parámetro ``Twiml``.
+    """
     host = host.removeprefix("https://").removeprefix("wss://").strip("/")
-    url = quoteattr(f"wss://{host}/ws")
-    return (
-        f'<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url={url}/></Connect></Response>'
-    )
+    return f"https://{host}/"
 
 
 def solicitud_llamada(sid: str, token: str, origen: str, destino: str, host: str) -> urllib.request.Request:
@@ -40,7 +41,7 @@ def solicitud_llamada(sid: str, token: str, origen: str, destino: str, host: str
             raise ValueError(
                 f"Número inválido {numero!r}: usa formato internacional, por ejemplo +5222XXXXXXXX"
             )
-    datos = urllib.parse.urlencode({"To": destino, "From": origen, "Twiml": twiml_stream(host)}).encode()
+    datos = urllib.parse.urlencode({"To": destino, "From": origen, "Url": url_webhook(host)}).encode()
     credencial = base64.b64encode(f"{sid}:{token}".encode()).decode()
     return urllib.request.Request(
         API.format(sid=sid), data=datos, method="POST", headers={"Authorization": f"Basic {credencial}"}
