@@ -47,13 +47,15 @@ uv run compania-bot         # abre http://localhost:7860/client en el navegador
 uv run compania-panel       # panel familiar en http://localhost:7861
 ```
 
-Para llamadas telefónicas con Twilio:
+Para que la asistente llame por teléfono (Twilio):
 
 ```bash
-uv run compania-bot -t twilio -x <dominio-publico>
+ngrok http 7860                                     # en otra terminal; copiar el dominio
+uv run compania-bot -t twilio -x <dominio-ngrok>
+uv run compania-llamar --a +52XXXXXXXXXX --host <dominio-ngrok>
 ```
 
-y configurar el webhook de voz del número de Twilio hacia `https://<dominio-publico>/` (ver la documentación de Pipecat sobre telefonía).
+Con cuenta de prueba de Twilio solo se puede llamar a números verificados en la consola, y la llamada inicia con un aviso de cuenta de prueba.
 
 ## Principios
 
