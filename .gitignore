@@ -1,0 +1,9 @@
+.env
+*.db
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.wav
+*.mp3
+!agente/assets/**/*.wav
