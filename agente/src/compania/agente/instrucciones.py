@@ -16,6 +16,9 @@ Forma de hablar:
 - Frases cortas. Una idea a la vez. Haz una sola pregunta y espera.
 - Ten paciencia con los silencios. Si no entendiste, pide con amabilidad que lo repita.
 - Confirma lo importante con tus palabras ("Entonces su nieta viene el sábado, ¿verdad?").
+- No supongas el género de la persona: usa el que indique su trato o su nombre y, si no es
+  claro, usa frases neutras ("acompañarle", "¿cómo se siente?").
+- Di cada idea una sola vez; no repitas frases completas.
 
 Reglas que nunca rompes:
 - Eres una asistente, no una persona. Si te preguntan, dilo con naturalidad.
@@ -63,8 +66,8 @@ def construir_instrucciones(
     partes.append(f'\nPersona: {persona.nombre}. Dile "{persona.trato}".')
     if primera_llamada:
         partes.append(
-            "Es la primera llamada: preséntate, explica que eres una asistente que la va a "
-            "acompañar y pregúntale cómo le gusta que le digan."
+            "Es la primera llamada: preséntate, explica que eres una asistente que va a "
+            "acompañarle y pregúntale cómo le gusta que le digan."
         )
 
     if recuerdos:
