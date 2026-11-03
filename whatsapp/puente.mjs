@@ -47,7 +47,24 @@ let marcando = false;
 let finUltimaLlamada = 0;
 const ocupado = () => marcando || Boolean(cliente.activeCall);
 
-const log = (...args) => console.log(new Date().toISOString().slice(11, 19), ...args);
+const DIAGNOSTICO = (process.env.WHATSAPP_DIAGNOSTICO ?? "1") !== "0";
+
+// libsignal imprime cada sesión que abre o cierra, con llaves de cifrado incluidas: se omite.
+const RUIDO = /^(Closing session|Opening session|Closing open session|Removing old closed session|Session already|Migrating session|Blocking on the main thread)/;
+for (const metodo of ["log", "info", "warn"]) {
+  const original = console[metodo].bind(console);
+  console[metodo] = (...args) => {
+    if (typeof args[0] === "string" && RUIDO.test(args[0])) return;
+    original(...args);
+  };
+}
+
+const hora = () => new Date().toLocaleTimeString("es-MX", { hour12: false });
+const log = (...args) => console.log(hora(), ...args);
+const resumir = (texto, max = 240) => {
+  const t = typeof texto === "string" ? texto : JSON.stringify(texto);
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+};
 
 /** Busca el número tal como lo registra WhatsApp (en México puede ser 52 o 521). */
 const resolverNumero = async (digitos) => {
@@ -87,10 +104,25 @@ const conectarConBot = (llamada) => {
     llamada.end();
   });
 
+  // Contadores de audio para diagnóstico: bloques de la persona y de la asistente cada 5 s
+  const cuenta = { persona: 0, asistente: 0 };
+  ws.on("message", (_datos, esBinario) => {
+    if (esBinario) cuenta.asistente += 1;
+  });
+  const medidor = DIAGNOSTICO
+    ? setInterval(() => {
+        log(`Audio 5 s: persona ${cuenta.persona} bloques, asistente ${cuenta.asistente} bloques`);
+        cuenta.persona = 0;
+        cuenta.asistente = 0;
+      }, 5_000)
+    : null;
+
   llamada.on("audio", (muestras) => {
+    cuenta.persona += 1;
     if (abierto && ws.readyState === WebSocket.OPEN) ws.send(floatAPcm16(muestras));
   });
   llamada.on("ended", () => {
+    if (medidor) clearInterval(medidor);
     if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
   });
 };
@@ -115,7 +147,7 @@ const llamar = async (digitos) => {
     finUltimaLlamada = Date.now();
     log("Llamada terminada:", motivo);
   });
-  llamada.on("evento", (nombre, datos) => log("Evento del motor:", nombre, datos));
+  if (DIAGNOSTICO) llamada.on("evento", (nombre, datos) => log("Evento del motor:", nombre, resumir(datos)));
   vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, sinRespuestaMs: SIN_RESPUESTA_MS, log });
   llamada.on("estado", (estado) => log("Estado de la llamada:", estado));
   llamada.on("ringing", () => log("Sonando"));
@@ -242,7 +274,11 @@ const servidor = createServer(async (req, res) => {
   try {
     const { numero } = await leerJson(req);
     const digitos = normalizarNumero(numero);
-    if (ocupado()) return responder(res, 409, { error: "Ya hay una llamada en curso" });
+    if (ocupado()) {
+      return responder(res, 409, {
+        error: "Ya hay una llamada en curso. Si ya colgaste, usa: uv run compania-llamar-wa --colgar",
+      });
+    }
     const callId = await llamar(digitos);
     return responder(res, 200, { mensaje: `Llamando por WhatsApp a ${digitos}...`, llamada: callId });
   } catch (error) {
@@ -258,6 +294,10 @@ await cliente.connect();
 // estados del motor de llamadas, que no siempre reporta el fin.
 cliente.socket.ws.on("CB:call", (nodo) => {
   const llamada = cliente.activeCall;
+  if (DIAGNOSTICO) {
+    const hijo = Array.isArray(nodo?.content) ? nodo.content[0] : null;
+    log("Aviso de WhatsApp:", hijo?.tag ?? "?", hijo?.attrs?.["call-id"] ?? "", llamada ? `(activa ${llamada.callId})` : "(sin llamada)");
+  }
   const fin = llamada && esFinDeLlamada(nodo, llamada.callId);
   if (fin) {
     log(`La otra persona ${fin} la llamada`);
