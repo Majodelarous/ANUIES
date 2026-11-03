@@ -46,3 +46,18 @@ test("deja de vigilar cuando la llamada termina", async () => {
   assert.equal(colgo, false);
   detener();
 });
+
+import { esFinDeLlamada } from "../vigilancia.mjs";
+
+const nodo = (tag, id) => ({ tag: "call", attrs: {}, content: [{ tag, attrs: { "call-id": id } }] });
+
+test("reconoce cuando la otra persona cuelga o rechaza", () => {
+  assert.equal(esFinDeLlamada(nodo("terminate", "ABC"), "abc"), "colgó");
+  assert.equal(esFinDeLlamada(nodo("reject", "ABC"), "ABC"), "rechazó");
+});
+
+test("ignora otros avisos u otras llamadas", () => {
+  assert.equal(esFinDeLlamada(nodo("accept", "ABC"), "ABC"), null);
+  assert.equal(esFinDeLlamada(nodo("terminate", "OTRA"), "ABC"), null);
+  assert.equal(esFinDeLlamada({ tag: "call" }, "ABC"), null);
+});

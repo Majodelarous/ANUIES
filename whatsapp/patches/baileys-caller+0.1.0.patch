@@ -77,7 +77,7 @@ index db66747..e3c22b7 100644
          const now = Date.now();
          if (this.#nextEmitAtMs === 0)
 diff --git a/node_modules/baileys-caller/dist/index.mjs b/node_modules/baileys-caller/dist/index.mjs
-index 33d3bd9..db666a7 100644
+index 33d3bd9..6217071 100644
 --- a/node_modules/baileys-caller/dist/index.mjs
 +++ b/node_modules/baileys-caller/dist/index.mjs
 @@ -74,6 +74,21 @@ export class ActiveCall extends EventEmitter {
@@ -120,7 +120,17 @@ index 33d3bd9..db666a7 100644
      };
      mute = (muted) => {
          try {
-@@ -149,6 +161,10 @@ export class VoipClient {
+@@ -106,6 +118,9 @@ export class ActiveCall extends EventEmitter {
+     waitForEnd = () => this.#endPromise;
+     /** @internal — called by VoipClient on WASM call-state change */
+     _updateState = (state) => {
++        // compania-voz: exponer cada estado para diagnóstico
++        if (state !== this.#state)
++            this.emit("estado", state);
+         this.#state = state;
+         if (state === CallState.PreacceptReceived)
+             this.emit("ringing");
+@@ -149,6 +164,10 @@ export class VoipClient {
      constructor(config) {
          this.#config = config;
      }
@@ -131,7 +141,7 @@ index 33d3bd9..db666a7 100644
      /** Connect to WhatsApp and bring up the WASM VoIP stack. */
      connect = async () => {
          this.#baileys = await loadBaileys();
-@@ -288,6 +304,11 @@ export class VoipClient {
+@@ -288,6 +307,11 @@ export class VoipClient {
          const call = new ActiveCall(callId, this.#engine, durationMs);
          call._audioSource = audioSource;
          this.#activeCall = call;
@@ -143,7 +153,7 @@ index 33d3bd9..db666a7 100644
          this.#engine.startCall({
              peerJid: peerLid,
              peerPn: targetPnJid,
-@@ -353,8 +374,16 @@ export class VoipClient {
+@@ -353,8 +377,16 @@ export class VoipClient {
                  this.#engine.sendAudioData(chunk, this.#capturePtr);
          }, audioSource);
          this.#feeder.start();

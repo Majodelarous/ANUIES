@@ -24,7 +24,7 @@ import WebSocket from "ws";
 
 import { floatAPcm16, normalizarNumero, numeroDeJid, pcm16AFloat } from "./audio.mjs";
 import { cargarEnv, clasificarMensaje, notaAWav } from "./mensajes.mjs";
-import { vigilarLlamada } from "./vigilancia.mjs";
+import { esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs";
 
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
 
@@ -36,7 +36,8 @@ const BOT_HTTP_URL = `http://127.0.0.1:${BOT_PUERTO}`;
 const DURACION_MAX_MS = Number(process.env.DURACION_MAX_MIN || 15) * 60_000;
 const GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
 const PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
-const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 20) * 1000;
+const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 30) * 1000;
+const SIN_RESPUESTA_MS = Number(process.env.WHATSAPP_SIN_RESPUESTA_S || 90) * 1000;
 
 const cliente = new VoipClient({ authDir: AUTH_DIR });
 let ocupado = false;
@@ -94,7 +95,8 @@ const llamar = async (digitos) => {
   log(`Llamando a ${numero}...`);
   const llamada = await cliente.call(numero, { audioSource: "push", durationMs: DURACION_MAX_MS });
   ocupado = true;
-  vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, log });
+  vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, sinRespuestaMs: SIN_RESPUESTA_MS, log });
+  llamada.on("estado", (estado) => log("Estado de la llamada:", estado));
   llamada.on("ringing", () => log("Sonando"));
   llamada.on("connected", () => {
     log("Contestó");
@@ -235,6 +237,17 @@ const servidor = createServer(async (req, res) => {
 
 log("Conectando con WhatsApp (si aparece un QR, escanéalo desde el celular de la asistente)...");
 await cliente.connect();
+
+// Aviso directo de WhatsApp cuando la otra persona cuelga o rechaza. No depende de los
+// estados del motor de llamadas, que no siempre reporta el fin.
+cliente.socket.ws.on("CB:call", (nodo) => {
+  const llamada = cliente.activeCall;
+  const fin = llamada && esFinDeLlamada(nodo, llamada.callId);
+  if (fin) {
+    log(`La otra persona ${fin} la llamada`);
+    llamada.end();
+  }
+});
 if (GRUPO) {
   await buscarGrupo().catch((error) => log("No se pudo leer los grupos:", error.message));
   escucharGrupo();

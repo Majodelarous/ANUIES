@@ -49,7 +49,13 @@ Si el puente responde "Ya hay una llamada en curso" después de colgar:
 uv run compania-llamar-wa --colgar
 ```
 
-El puente también cuelga solo si nadie contesta en 60 segundos o si deja de llegar audio de la otra persona por 20 segundos (`WHATSAPP_SIN_AUDIO_S`).
+Cómo se entera el puente de que la llamada terminó:
+
+1. Aviso de WhatsApp: cuando la persona cuelga o rechaza, WhatsApp manda un aviso `terminate` o `reject` y el puente cuelga de inmediato.
+2. Respaldo: si deja de llegar audio de la otra persona por 30 segundos (`WHATSAPP_SIN_AUDIO_S`), cuelga.
+3. Si nadie contesta en 90 segundos (`WHATSAPP_SIN_RESPUESTA_S`), cuelga. Se deja holgado porque a las personas mayores les puede tomar tiempo contestar.
+
+En la terminal del puente aparece cada "Estado de la llamada" y quién colgó, para diagnosticar.
 
 El número va con código de país y solo dígitos. El puente verifica con WhatsApp el formato correcto (en México puede ser 52 o 521).
 

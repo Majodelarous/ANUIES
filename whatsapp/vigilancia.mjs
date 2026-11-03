@@ -36,3 +36,15 @@ export const vigilarLlamada = (
   llamada.once("ended", detener);
   return detener;
 };
+
+/**
+ * ¿Este aviso de WhatsApp dice que la otra persona colgó o rechazó la llamada `callId`?
+ * WhatsApp manda un nodo <call> con un hijo <terminate> o <reject> que trae el call-id.
+ */
+export const esFinDeLlamada = (nodo, callId) => {
+  const hijo = Array.isArray(nodo?.content) ? nodo.content[0] : null;
+  if (!hijo || !["terminate", "reject"].includes(hijo.tag)) return null;
+  const id = String(hijo.attrs?.["call-id"] ?? hijo.attrs?.call_id ?? "");
+  if (callId && id && id.toUpperCase() !== String(callId).toUpperCase()) return null;
+  return hijo.tag === "reject" ? "rechazó" : "colgó";
+};
