@@ -6,9 +6,10 @@
   "description": "Puente entre WhatsApp (llamadas de voz) y el agente de Compañía por voz",
   "scripts": {
     "postinstall": "patch-package",
-    "start": "node puente.mjs",
+    "start": "node supervisor.mjs",
     "test": "node --test",
-    "prueba": "node prueba-llamada.mjs"
+    "prueba": "node prueba-llamada.mjs",
+    "puente": "node puente.mjs"
   },
   "engines": {
     "node": ">=20"

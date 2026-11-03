@@ -61,6 +61,16 @@ El número va con código de país y solo dígitos. El puente verifica con Whats
 
 El celular de la asistente no necesita estar prendido todo el tiempo, pero WhatsApp cierra los dispositivos vinculados si el celular principal pasa mucho tiempo sin conectarse.
 
+## Un proceso nuevo por llamada
+
+`npm start` arranca un supervisor que atiende el puerto 7864 y levanta el puente como proceso hijo. Al terminar cada llamada el puente se cierra y el supervisor lo vuelve a levantar limpio (unos 20 segundos).
+
+Por qué: la librería de llamadas guarda estado interno (motor, conexiones de audio con los servidores de WhatsApp) y, si se reutiliza el proceso, la siguiente llamada se cae al contestar. Cerrar esas conexiones a mano rompía la librería; un proceso nuevo garantiza que cada llamada empiece de cero.
+
+Las peticiones que llegan mientras el puente se reinicia (por ejemplo, el resumen que el bot manda al grupo al colgar) esperan y se entregan al puente nuevo. Si la llamada falla justo al contestar, el supervisor vuelve a marcar una vez con el puente nuevo.
+
+`npm run puente` corre solo el puente, sin supervisor, para pruebas.
+
 ## Grupo de la familia
 
 Con `WHATSAPP_GRUPO` en `agente/.env` (nombre exacto del grupo, y el número de la asistente dentro del grupo):

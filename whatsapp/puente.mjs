@@ -4,7 +4,12 @@
  * Mantiene la sesión de WhatsApp de la asistente (vinculada como dispositivo con un QR) y,
  * cuando se le pide, hace una llamada de voz y conecta su audio con el bot por websocket.
  *
- *   npm start                     # la primera vez muestra un QR: WhatsApp > Dispositivos vinculados
+ *   npm start                     # arranca el supervisor, que levanta este puente (ver supervisor.mjs)
+ *   npm run puente                # solo el puente, sin supervisor (para pruebas)
+ *
+ * Bajo el supervisor, el puente atiende una llamada y al terminar se cierra; el supervisor lo
+ * vuelve a levantar limpio para la siguiente.
+ *
  *   POST http://127.0.0.1:7864/llamar  {"numero": "522221234567"}
  *   POST http://127.0.0.1:7864/enviar  {"texto": "..."}   # al grupo de la familia
  *   POST http://127.0.0.1:7864/colgar                      # cuelga y libera el puente
@@ -29,7 +34,10 @@ import { debeReintentar, esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
 
 const AUTH_DIR = process.env.WA_AUTH_DIR || "./auth";
-const PUERTO = Number(process.env.WHATSAPP_PUENTE_PUERTO || process.env.PUENTE_PUERTO || 7864);
+const BAJO_SUPERVISOR = process.env.BAJO_SUPERVISOR === "1" && typeof process.send === "function";
+const PUERTO = BAJO_SUPERVISOR
+  ? Number(process.env.WHATSAPP_PUENTE_INTERNO || 7865)
+  : Number(process.env.WHATSAPP_PUENTE_PUERTO || process.env.PUENTE_PUERTO || 7864);
 const BOT_PUERTO = Number(process.env.WHATSAPP_BOT_PUERTO || 7863);
 const BOT_WS_URL = process.env.BOT_WS_URL || `ws://127.0.0.1:${BOT_PUERTO}/wa`;
 const BOT_HTTP_URL = `http://127.0.0.1:${BOT_PUERTO}`;
@@ -151,8 +159,18 @@ const llamar = async (digitos, reintentos = 0) => {
   llamada.waitForEnd().then((motivo) => {
     finUltimaLlamada = Date.now();
     log("Llamada terminada:", motivo);
-    if (debeReintentar({ ...seguimiento, terminoEn: finUltimaLlamada, reintentos })) {
-      log("El audio no se conectó al contestar; se vuelve a marcar una vez");
+    const reintentar = debeReintentar({ ...seguimiento, terminoEn: finUltimaLlamada, reintentos });
+    if (reintentar) log("El audio no se conectó al contestar; se vuelve a marcar una vez");
+
+    if (BAJO_SUPERVISOR) {
+      // Proceso nuevo para la siguiente llamada (y para el reintento, si toca)
+      process.send({ tipo: "fin", reintentar: reintentar ? digitos : null });
+      setTimeout(() => {
+        servidor.close();
+        cliente.disconnect();
+        process.exit(0);
+      }, 1_500);
+    } else if (reintentar) {
       llamar(digitos, reintentos + 1).catch((error) => log("No se pudo reintentar:", error.message));
     }
   });
@@ -327,6 +345,7 @@ if (GRUPO) {
 }
 servidor.listen(PUERTO, "127.0.0.1", () => {
   log(`Listo. Puente en http://127.0.0.1:${PUERTO}  (bot: ${BOT_WS_URL})`);
+  if (BAJO_SUPERVISOR) process.send({ tipo: "listo" });
 });
 
 const cerrar = () => {
