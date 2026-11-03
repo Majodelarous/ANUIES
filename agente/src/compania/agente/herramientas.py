@@ -13,6 +13,7 @@ from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import OutputAudioRawFrame
 
 from compania.dominio import bienestar
+from compania.dominio.agenda import Agenda
 from compania.dominio.alertas import LINEA_DE_LA_VIDA, instruccion_para_nivel
 from compania.dominio.juegos import JUEGOS_POR_ID, TipoJuego, obtener_juego
 from compania.dominio.modelos import (
@@ -61,9 +62,11 @@ class Sesion:
         *,
         aviso: AvisoFamilia | None = None,
         trato: str = "la persona",
+        agenda: Agenda | None = None,
     ) -> None:
         self.repo = repo
         self.persona_id = persona_id
+        self.agenda = agenda or Agenda.desde(repo.mensajes_pendientes(persona_id))
         self.aviso = aviso or SinAviso()
         self.trato = trato
         self.juegos_usados: set[str] = set()
@@ -158,7 +161,25 @@ class Sesion:
         ok = self.repo.marcar_entregado(mensaje_id, self.persona_id)
         if ok and mensaje:
             self.mensajes_entregados.append(mensaje.de)
+            self.agenda.entregar(mensaje_id)
         return ok
+
+    async def consultar_pendientes(self, params: ParametrosLlamada) -> None:
+        pendientes = self.agenda.pendientes()
+        await params.result_callback(
+            {
+                "pendientes": [
+                    {
+                        "mensaje_id": m.id,
+                        "de": m.de,
+                        "tipo": "nota de voz" if m.audio else "texto",
+                        "texto": m.texto,
+                    }
+                    for m in pendientes
+                ],
+                "que_hacer": "Ofrécelos antes de despedirte." if pendientes else "No hay pendientes.",
+            }
+        )
 
     async def marcar_mensaje_entregado(self, params: ParametrosLlamada) -> None:
         await params.result_callback({"marcado": self._entregar(int(params.arguments["mensaje_id"]))})
@@ -230,6 +251,14 @@ class Sesion:
             )
         if self.recordatorios_creados:
             lineas.append("Pidió recordatorios: " + "; ".join(self.recordatorios_creados) + ".")
+        if self.agenda.pendientes():
+            lineas.append(
+                "Quedó pendiente para la próxima llamada: "
+                + ", ".join(
+                    f"{'nota de voz' if m.audio else 'mensaje'} de {m.de}" for m in self.agenda.pendientes()
+                )
+                + "."
+            )
         if self.alertas:
             lineas.append("Alertas: " + "; ".join(self.alertas) + ".")
         else:
@@ -312,6 +341,16 @@ class Sesion:
                 properties={"mensaje_id": {"type": "integer"}},
                 required=["mensaje_id"],
                 handler=self.marcar_mensaje_entregado,
+            ),
+            FunctionSchema(
+                name="consultar_pendientes",
+                description=(
+                    "Dice qué mensajes y notas de voz de la familia faltan por entregar en esta llamada. "
+                    "Úsala antes de despedirte."
+                ),
+                properties={},
+                required=[],
+                handler=self.consultar_pendientes,
             ),
             FunctionSchema(
                 name="reproducir_mensaje_voz",

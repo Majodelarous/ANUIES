@@ -172,6 +172,19 @@ def solicitud_llamada(numero: str, puerto: int = 7864) -> urllib.request.Request
     )
 
 
+def _pedir_al_puente(solicitud: urllib.request.Request) -> dict:
+    try:
+        with urllib.request.urlopen(solicitud, timeout=60) as respuesta:
+            return json.load(respuesta)
+    except urllib.error.HTTPError as error:
+        detalle = json.loads(error.read() or b"{}")
+        raise SystemExit(f"El puente rechazó la petición: {detalle.get('error', error.code)}") from None
+    except urllib.error.URLError:
+        raise SystemExit(
+            "No responde el puente de WhatsApp. Inícialo con: cd whatsapp && npm start"
+        ) from None
+
+
 def llamar() -> None:
     load_dotenv(override=True)
     parser = argparse.ArgumentParser(description="La asistente llama por WhatsApp")
@@ -181,20 +194,17 @@ def llamar() -> None:
         default=os.getenv("WHATSAPP_PERSONA"),
         help="Número con código de país (o WHATSAPP_PERSONA en .env)",
     )
+    parser.add_argument("--colgar", action="store_true", help="Cuelga la llamada en curso y libera el puente")
     args = parser.parse_args()
+    puerto = int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864"))
+
+    if args.colgar:
+        solicitud = urllib.request.Request(f"http://127.0.0.1:{puerto}/colgar", data=b"{}", method="POST")
+        print(_pedir_al_puente(solicitud).get("mensaje", "Listo"))
+        return
     if not args.numero:
         parser.error("Falta el número: pásalo como argumento o define WHATSAPP_PERSONA en .env")
-    solicitud = solicitud_llamada(args.numero, int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864")))
-    try:
-        with urllib.request.urlopen(solicitud, timeout=60) as respuesta:
-            print(json.load(respuesta).get("mensaje", "Llamando..."))
-    except urllib.error.HTTPError as error:
-        detalle = json.loads(error.read() or b"{}")
-        raise SystemExit(f"El puente rechazó la llamada: {detalle.get('error', error.code)}") from None
-    except urllib.error.URLError:
-        raise SystemExit(
-            "No responde el puente de WhatsApp. Inícialo con: cd whatsapp && npm start"
-        ) from None
+    print(_pedir_al_puente(solicitud_llamada(args.numero, puerto)).get("mensaje", "Llamando..."))
 
 
 if __name__ == "__main__":

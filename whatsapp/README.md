@@ -43,6 +43,14 @@ cd whatsapp && npm start
 cd agente && uv run compania-llamar-wa 522221234567
 ```
 
+Si el puente responde "Ya hay una llamada en curso" después de colgar:
+
+```bash
+uv run compania-llamar-wa --colgar
+```
+
+El puente también cuelga solo si nadie contesta en 60 segundos o si deja de llegar audio de la otra persona por 20 segundos (`WHATSAPP_SIN_AUDIO_S`).
+
 El número va con código de país y solo dígitos. El puente verifica con WhatsApp el formato correcto (en México puede ser 52 o 521).
 
 El celular de la asistente no necesita estar prendido todo el tiempo, pero WhatsApp cierra los dispositivos vinculados si el celular principal pasa mucho tiempo sin conectarse.

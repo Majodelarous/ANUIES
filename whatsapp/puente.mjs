@@ -7,6 +7,7 @@
  *   npm start                     # la primera vez muestra un QR: WhatsApp > Dispositivos vinculados
  *   POST http://127.0.0.1:7864/llamar  {"numero": "522221234567"}
  *   POST http://127.0.0.1:7864/enviar  {"texto": "..."}   # al grupo de la familia
+ *   POST http://127.0.0.1:7864/colgar                      # cuelga y libera el puente
  *
  * También escucha el grupo de la familia (WHATSAPP_GRUPO): las notas de voz y los textos que
  * empiezan con "abue" se guardan en el bot para la próxima llamada.
@@ -23,6 +24,7 @@ import WebSocket from "ws";
 
 import { floatAPcm16, normalizarNumero, numeroDeJid, pcm16AFloat } from "./audio.mjs";
 import { cargarEnv, clasificarMensaje, notaAWav } from "./mensajes.mjs";
+import { vigilarLlamada } from "./vigilancia.mjs";
 
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
 
@@ -34,6 +36,7 @@ const BOT_HTTP_URL = `http://127.0.0.1:${BOT_PUERTO}`;
 const DURACION_MAX_MS = Number(process.env.DURACION_MAX_MIN || 15) * 60_000;
 const GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
 const PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
+const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 20) * 1000;
 
 const cliente = new VoipClient({ authDir: AUTH_DIR });
 let ocupado = false;
@@ -91,6 +94,7 @@ const llamar = async (digitos) => {
   log(`Llamando a ${numero}...`);
   const llamada = await cliente.call(numero, { audioSource: "push", durationMs: DURACION_MAX_MS });
   ocupado = true;
+  vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, log });
   llamada.on("ringing", () => log("Sonando"));
   llamada.on("connected", () => {
     log("Contestó");
@@ -194,6 +198,13 @@ const leerJson = (req) =>
 const servidor = createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/estado") {
     return responder(res, 200, { conectado: Boolean(cliente.socket), en_llamada: ocupado, grupo: Boolean(grupoJid) });
+  }
+  if (req.method === "POST" && req.url === "/colgar") {
+    const llamada = cliente.activeCall;
+    if (llamada) llamada.end();
+    ocupado = false;
+    log(llamada ? "Llamada colgada a mano" : "No había llamada; se libera el puente");
+    return responder(res, 200, { mensaje: llamada ? "Llamada colgada" : "No había llamada en curso" });
   }
   if (req.method === "POST" && req.url === "/enviar") {
     try {

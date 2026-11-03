@@ -15,7 +15,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import LLMMessagesAppendFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -179,8 +179,20 @@ async def run_bot(
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint if runner_args else False)
     await runner.add_workers(worker)
 
+    @assistant_aggregator.event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message):
+        nota = sesion.agenda.turno_terminado()
+        if nota:
+            logger.info(f"Recordando pendientes: {sesion.agenda.descripcion()}")
+            await worker.queue_frames(
+                [LLMMessagesAppendFrame([{"role": "user", "content": nota}], run_llm=False)]
+            )
+
     async def iniciar_conversacion() -> None:
-        context.add_message({"role": "developer", "content": SALUDO})
+        saludo = SALUDO
+        if sesion.agenda.pendientes():
+            saludo += f" Después del saludo ofrece los mensajes de la familia: {sesion.agenda.descripcion()}."
+        context.add_message({"role": "developer", "content": saludo})
         await worker.queue_frames([LLMRunFrame()])
 
     if llamada.canal == "web":
