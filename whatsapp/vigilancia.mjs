@@ -48,3 +48,16 @@ export const esFinDeLlamada = (nodo, callId) => {
   if (callId && id && id.toUpperCase() !== String(callId).toUpperCase()) return null;
   return hijo.tag === "reject" ? "rechazó" : "colgó";
 };
+
+/**
+ * ¿Conviene volver a marcar? Solo si contestaron, la llamada terminó en los primeros
+ * segundos y casi no llegó audio de la persona (la conexión de audio falló al inicio).
+ */
+export const debeReintentar = (
+  { contestoEn, terminoEn, bloquesPersona, reintentos },
+  { ventanaMs = 15_000, minimoBloques = 25, maxReintentos = 1 } = {},
+) =>
+  Boolean(contestoEn) &&
+  reintentos < maxReintentos &&
+  terminoEn - contestoEn < ventanaMs &&
+  bloquesPersona < minimoBloques;

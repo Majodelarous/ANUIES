@@ -238,6 +238,16 @@ class Sesion:
             await self.aviso.enviar(aviso)
         await params.result_callback({"registrada": True, "que_decir": instruccion_para_nivel(nivel)})
 
+    def hubo_actividad(self) -> bool:
+        """¿Pasó algo que valga la pena contarle a la familia?"""
+        return bool(
+            self.recuerdos_compartidos
+            or self.juegos_jugados
+            or self.mensajes_entregados
+            or self.recordatorios_creados
+            or self.alertas
+        )
+
     def resumen(self, minutos: int) -> str:
         """Texto breve para el grupo de la familia al terminar la llamada."""
         lineas = [f"Llamada con {self.trato}: {minutos} min."]

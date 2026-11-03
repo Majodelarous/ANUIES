@@ -56,3 +56,10 @@ def test_resumen_avisa_lo_que_quedo_pendiente(repo, persona):
     repo.guardar_mensaje(MensajeFamiliar(persona.id, "Majo", "", "audios/a.wav"))
     texto = Sesion(repo, persona.id, trato="la abue").resumen(3)
     assert "Quedó pendiente para la próxima llamada: nota de voz de Majo." in texto
+
+
+async def test_actividad_de_la_llamada(repo, persona):
+    sesion = Sesion(repo, persona.id)
+    assert not sesion.hubo_actividad()
+    await sesion.crear_recordatorio(ParametrosFalsos({"texto": "Regar", "hora": "18:00"}))
+    assert sesion.hubo_actividad()

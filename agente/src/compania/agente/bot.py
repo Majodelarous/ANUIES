@@ -38,6 +38,7 @@ from compania.infraestructura.repositorio import Repositorio
 
 load_dotenv(override=True)
 
+LLAMADA_MINIMA_S = 20  # llamadas más cortas y sin actividad (se cayó al contestar) no se reportan
 SALUDO = "Inicia la llamada saludando a la persona como indican tus instrucciones."
 
 
@@ -211,8 +212,11 @@ async def run_bot(
     async def on_client_disconnected(transport, client):
         logger.info(f"Fin de la llamada {llamada.id}")
         repo.terminar_llamada(llamada.id)
-        minutos = max(1, round((datetime.now() - llamada.inicio).total_seconds() / 60))
-        await sesion.aviso.enviar(sesion.resumen(minutos))
+        segundos = (datetime.now() - llamada.inicio).total_seconds()
+        if segundos < LLAMADA_MINIMA_S and not sesion.hubo_actividad():
+            logger.info(f"Llamada de {segundos:.0f} s sin actividad: no se manda resumen a la familia")
+        else:
+            await sesion.aviso.enviar(sesion.resumen(max(1, round(segundos / 60))))
         await runner.cancel()
 
     await runner.run()

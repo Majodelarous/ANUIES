@@ -61,3 +61,14 @@ test("ignora otros avisos u otras llamadas", () => {
   assert.equal(esFinDeLlamada(nodo("terminate", "OTRA"), "ABC"), null);
   assert.equal(esFinDeLlamada({ tag: "call" }, "ABC"), null);
 });
+
+import { debeReintentar } from "../vigilancia.mjs";
+
+test("reintenta solo si falló el audio al contestar", () => {
+  const base = { contestoEn: 1000, terminoEn: 7000, bloquesPersona: 0, reintentos: 0 };
+  assert.equal(debeReintentar(base), true);
+  assert.equal(debeReintentar({ ...base, reintentos: 1 }), false); // una sola vez
+  assert.equal(debeReintentar({ ...base, contestoEn: 0 }), false); // no contestó
+  assert.equal(debeReintentar({ ...base, bloquesPersona: 219 }), false); // sí hubo audio
+  assert.equal(debeReintentar({ ...base, terminoEn: 60_000 }), false); // llamada normal
+});

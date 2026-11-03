@@ -24,7 +24,7 @@ import WebSocket from "ws";
 
 import { floatAPcm16, normalizarNumero, numeroDeJid, pcm16AFloat } from "./audio.mjs";
 import { cargarEnv, clasificarMensaje, notaAWav } from "./mensajes.mjs";
-import { esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs";
+import { debeReintentar, esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs";
 
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
 
@@ -127,7 +127,7 @@ const conectarConBot = (llamada) => {
   });
 };
 
-const llamar = async (digitos) => {
+const llamar = async (digitos, reintentos = 0) => {
   marcando = true;
   let llamada;
   try {
@@ -142,10 +142,19 @@ const llamar = async (digitos) => {
   } finally {
     marcando = false;
   }
+  // Para decidir si se reintenta: cuándo contestó y cuánto audio de la persona llegó
+  const seguimiento = { contestoEn: 0, bloquesPersona: 0 };
+  llamada.on("connected", () => { seguimiento.contestoEn = Date.now(); });
+  llamada.on("audio", () => { seguimiento.bloquesPersona += 1; });
+
   // waitForEnd se resuelve aunque la llamada haya terminado antes de llegar aquí
   llamada.waitForEnd().then((motivo) => {
     finUltimaLlamada = Date.now();
     log("Llamada terminada:", motivo);
+    if (debeReintentar({ ...seguimiento, terminoEn: finUltimaLlamada, reintentos })) {
+      log("El audio no se conectó al contestar; se vuelve a marcar una vez");
+      llamar(digitos, reintentos + 1).catch((error) => log("No se pudo reintentar:", error.message));
+    }
   });
   if (DIAGNOSTICO) {
     // Se omiten los eventos que se repiten varias veces por segundo (niveles de audio, relays)
