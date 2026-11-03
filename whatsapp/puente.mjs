@@ -40,7 +40,12 @@ const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 30) * 1000;
 const SIN_RESPUESTA_MS = Number(process.env.WHATSAPP_SIN_RESPUESTA_S || 90) * 1000;
 
 const cliente = new VoipClient({ authDir: AUTH_DIR });
-let ocupado = false;
+// La llamada en curso la lleva la librería (cliente.activeCall). "marcando" cubre los segundos
+// en que se prepara la llamada, y la pausa deja que lleguen los últimos eventos de la anterior.
+const PAUSA_ENTRE_LLAMADAS_MS = 4_000;
+let marcando = false;
+let finUltimaLlamada = 0;
+const ocupado = () => marcando || Boolean(cliente.activeCall);
 
 const log = (...args) => console.log(new Date().toISOString().slice(11, 19), ...args);
 
@@ -91,10 +96,26 @@ const conectarConBot = (llamada) => {
 };
 
 const llamar = async (digitos) => {
-  const numero = await resolverNumero(digitos);
-  log(`Llamando a ${numero}...`);
-  const llamada = await cliente.call(numero, { audioSource: "push", durationMs: DURACION_MAX_MS });
-  ocupado = true;
+  marcando = true;
+  let llamada;
+  try {
+    const espera = finUltimaLlamada + PAUSA_ENTRE_LLAMADAS_MS - Date.now();
+    if (espera > 0) {
+      log(`Esperando ${Math.ceil(espera / 1000)} s a que cierre la llamada anterior`);
+      await new Promise((r) => setTimeout(r, espera));
+    }
+    const numero = await resolverNumero(digitos);
+    log(`Llamando a ${numero}...`);
+    llamada = await cliente.call(numero, { audioSource: "push", durationMs: DURACION_MAX_MS });
+  } finally {
+    marcando = false;
+  }
+  // waitForEnd se resuelve aunque la llamada haya terminado antes de llegar aquí
+  llamada.waitForEnd().then((motivo) => {
+    finUltimaLlamada = Date.now();
+    log("Llamada terminada:", motivo);
+  });
+  llamada.on("evento", (nombre, datos) => log("Evento del motor:", nombre, datos));
   vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, sinRespuestaMs: SIN_RESPUESTA_MS, log });
   llamada.on("estado", (estado) => log("Estado de la llamada:", estado));
   llamada.on("ringing", () => log("Sonando"));
@@ -103,10 +124,6 @@ const llamar = async (digitos) => {
     conectarConBot(llamada);
   });
   llamada.on("error", (error) => log("Error en la llamada:", error.message));
-  llamada.on("ended", (motivo) => {
-    ocupado = false;
-    log("Llamada terminada:", motivo);
-  });
   return llamada.callId;
 };
 
@@ -199,12 +216,12 @@ const leerJson = (req) =>
 
 const servidor = createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/estado") {
-    return responder(res, 200, { conectado: Boolean(cliente.socket), en_llamada: ocupado, grupo: Boolean(grupoJid) });
+    return responder(res, 200, { conectado: Boolean(cliente.socket), en_llamada: ocupado(), grupo: Boolean(grupoJid) });
   }
   if (req.method === "POST" && req.url === "/colgar") {
     const llamada = cliente.activeCall;
     if (llamada) llamada.end();
-    ocupado = false;
+    marcando = false;
     log(llamada ? "Llamada colgada a mano" : "No había llamada; se libera el puente");
     return responder(res, 200, { mensaje: llamada ? "Llamada colgada" : "No había llamada en curso" });
   }
@@ -225,11 +242,10 @@ const servidor = createServer(async (req, res) => {
   try {
     const { numero } = await leerJson(req);
     const digitos = normalizarNumero(numero);
-    if (ocupado) return responder(res, 409, { error: "Ya hay una llamada en curso" });
+    if (ocupado()) return responder(res, 409, { error: "Ya hay una llamada en curso" });
     const callId = await llamar(digitos);
     return responder(res, 200, { mensaje: `Llamando por WhatsApp a ${digitos}...`, llamada: callId });
   } catch (error) {
-    ocupado = false;
     log("No se pudo llamar:", error.message);
     return responder(res, 400, { error: error.message });
   }

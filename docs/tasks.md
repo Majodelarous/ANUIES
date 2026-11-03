@@ -23,6 +23,7 @@
 
 ## Iteración 3: notificaciones y despliegue
 
-- [ ] T14 Grupo de WhatsApp de la familia: resumen al terminar cada llamada, alertas de atención y crisis al momento, notas de voz y textos ("Abue, ...") que se entregan en la llamada, respuesta de la persona al grupo (código listo; falta probar)
+- [x] T14 Grupo de WhatsApp de la familia: resumen al terminar cada llamada, alertas de atención y crisis al momento, notas de voz y textos ("Abue, ...") que se entregan en la llamada, respuesta de la persona al grupo (probado el 2026-11-02: notas de voz, respuestas y resumen llegan al grupo)
+- [ ] T17 Respuesta de la persona como nota de voz con su propia voz (grabar lo que dicta en la llamada y mandarlo al grupo como audio, en lugar de texto) (pendiente)
 - [ ] T16 Imágenes de buenos días: ayudar a la persona a conseguir y mandar sus imágenes al grupo (pendiente)
 - [ ] T15 Despliegue en la nube con infraestructura como código
