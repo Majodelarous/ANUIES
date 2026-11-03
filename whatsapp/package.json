@@ -7,9 +7,12 @@
   "scripts": {
     "postinstall": "patch-package",
     "start": "node puente.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "prueba": "node prueba-llamada.mjs"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "baileys-caller": "github:SheIITear/baileys-caller#36c6e0a03d7d80723b4f203a45d4cb9e1a4b86f6",

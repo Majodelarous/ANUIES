@@ -147,7 +147,13 @@ const llamar = async (digitos) => {
     finUltimaLlamada = Date.now();
     log("Llamada terminada:", motivo);
   });
-  if (DIAGNOSTICO) llamada.on("evento", (nombre, datos) => log("Evento del motor:", nombre, resumir(datos)));
+  if (DIAGNOSTICO) {
+    // Se omiten los eventos que se repiten varias veces por segundo (niveles de audio, relays)
+    const RUIDOSOS = new Set(["tipo 100", "tipo 156"]);
+    llamada.on("evento", (nombre, datos) => {
+      if (!RUIDOSOS.has(nombre)) log("Evento del motor:", nombre, resumir(datos, 160));
+    });
+  }
   vigilarLlamada(llamada, { sinAudioMs: SIN_AUDIO_MS, sinRespuestaMs: SIN_RESPUESTA_MS, log });
   llamada.on("estado", (estado) => log("Estado de la llamada:", estado));
   llamada.on("ringing", () => log("Sonando"));
@@ -296,7 +302,7 @@ cliente.socket.ws.on("CB:call", (nodo) => {
   const llamada = cliente.activeCall;
   if (DIAGNOSTICO) {
     const hijo = Array.isArray(nodo?.content) ? nodo.content[0] : null;
-    log("Aviso de WhatsApp:", hijo?.tag ?? "?", hijo?.attrs?.["call-id"] ?? "", llamada ? `(activa ${llamada.callId})` : "(sin llamada)");
+    if (hijo?.tag !== "relaylatency") log("Aviso de WhatsApp:", hijo?.tag ?? "?", hijo?.attrs?.["call-id"] ?? "", llamada ? `(activa ${llamada.callId})` : "(sin llamada)");
   }
   const fin = llamada && esFinDeLlamada(nodo, llamada.callId);
   if (fin) {
