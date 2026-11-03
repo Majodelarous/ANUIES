@@ -36,9 +36,19 @@ class AvisoFalso:
     def __init__(self, ok: bool = True) -> None:
         self.ok = ok
         self.enviados: list[str] = []
+        self.audios: list[tuple[bytes, str]] = []
+        self.imagenes: list[tuple[bytes, str]] = []
 
     async def enviar(self, texto: str) -> bool:
         self.enviados.append(texto)
+        return self.ok
+
+    async def enviar_audio(self, wav: bytes, texto: str = "") -> bool:
+        self.audios.append((wav, texto))
+        return self.ok
+
+    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
+        self.imagenes.append((imagen, texto))
         return self.ok
 
 

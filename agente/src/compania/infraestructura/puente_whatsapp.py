@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import urllib.error
@@ -17,6 +18,10 @@ class AvisoFamilia(Protocol):
 
     async def enviar(self, texto: str) -> bool: ...
 
+    async def enviar_audio(self, wav: bytes, texto: str = "") -> bool: ...
+
+    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool: ...
+
 
 class SinAviso:
     """No envía nada (cuando no hay grupo configurado)."""
@@ -25,28 +30,49 @@ class SinAviso:
         logger.info(f"Aviso a la familia (sin grupo configurado): {texto}")
         return False
 
+    async def enviar_audio(self, wav: bytes, texto: str = "") -> bool:
+        logger.info(f"Nota de voz para la familia (sin grupo configurado): {len(wav)} bytes")
+        return False
+
+    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
+        logger.info(f"Imagen para la familia (sin grupo configurado): {len(imagen)} bytes")
+        return False
+
 
 class PuenteWhatsApp:
     """Pide al puente que mande un texto al grupo configurado en ``WHATSAPP_GRUPO``."""
 
-    def __init__(self, puerto: int = 7864, timeout: float = 15):
-        self.url = f"http://127.0.0.1:{puerto}/enviar"
+    def __init__(self, puerto: int = 7864, timeout: float = 30):
+        self.base = f"http://127.0.0.1:{puerto}"
         self.timeout = timeout
 
-    def _post(self, texto: str) -> bool:
-        datos = json.dumps({"texto": texto}).encode()
+    def _post(self, ruta: str, cuerpo: dict) -> bool:
+        datos = json.dumps(cuerpo).encode()
         solicitud = urllib.request.Request(
-            self.url, data=datos, method="POST", headers={"Content-Type": "application/json"}
+            self.base + ruta, data=datos, method="POST", headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(solicitud, timeout=self.timeout) as respuesta:
             return respuesta.status == 200
 
-    async def enviar(self, texto: str) -> bool:
+    async def _enviar(self, ruta: str, cuerpo: dict) -> bool:
         try:
-            return await asyncio.to_thread(self._post, texto)
+            return await asyncio.to_thread(self._post, ruta, cuerpo)
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             logger.warning(f"No se pudo avisar al grupo de la familia: {error}")
             return False
+
+    async def enviar(self, texto: str) -> bool:
+        return await self._enviar("/enviar", {"texto": texto})
+
+    async def enviar_audio(self, wav: bytes, texto: str = "") -> bool:
+        return await self._enviar(
+            "/enviar-audio", {"audio_wav_b64": base64.b64encode(wav).decode(), "texto": texto}
+        )
+
+    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
+        return await self._enviar(
+            "/enviar-imagen", {"imagen_b64": base64.b64encode(imagen).decode(), "texto": texto}
+        )
 
 
 def aviso_desde_entorno() -> AvisoFamilia:

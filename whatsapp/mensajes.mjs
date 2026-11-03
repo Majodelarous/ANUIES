@@ -82,3 +82,24 @@ export const notaAWav = (audio, frecuencia = 16000) =>
     ffmpeg.stdin.on("error", () => {});
     ffmpeg.stdin.end(audio);
   });
+
+/** Convierte un WAV a nota de voz de WhatsApp (ogg/opus mono). */
+export const wavAOggOpus = (wav) =>
+  new Promise((resolve, reject) => {
+    const ffmpeg = spawn("ffmpeg", [
+      "-hide_banner", "-loglevel", "error",
+      "-i", "pipe:0",
+      "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "32k", "-f", "ogg", "pipe:1",
+    ]);
+    const partes = [];
+    let error = "";
+    ffmpeg.stdout.on("data", (d) => partes.push(d));
+    ffmpeg.stderr.on("data", (d) => { error += d; });
+    ffmpeg.on("error", reject);
+    ffmpeg.on("close", (codigo) => {
+      if (codigo !== 0) return reject(new Error(`ffmpeg falló: ${error.trim() || codigo}`));
+      resolve(Buffer.concat(partes));
+    });
+    ffmpeg.stdin.on("error", () => {});
+    ffmpeg.stdin.end(wav);
+  });

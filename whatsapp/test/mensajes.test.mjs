@@ -65,3 +65,11 @@ test("lee el .env sin pisar lo que ya existe", () => {
   assert.equal(process.env.PRUEBA_YA, "original");
   assert.equal(process.env.PRUEBA_NUEVA, "Familia Test");
 });
+
+import { wavAOggOpus } from "../mensajes.mjs";
+
+test("convierte un WAV a nota de voz ogg/opus", async () => {
+  const pcm = Buffer.alloc(16000 * 2); // 1 s de silencio
+  const ogg = await wavAOggOpus(wavDesdePcm(pcm, 16000));
+  assert.equal(ogg.toString("ascii", 0, 4), "OggS");
+});

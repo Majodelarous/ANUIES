@@ -28,7 +28,7 @@ import { VoipClient } from "baileys-caller";
 import WebSocket from "ws";
 
 import { floatAPcm16, normalizarNumero, numeroDeJid, pcm16AFloat } from "./audio.mjs";
-import { cargarEnv, clasificarMensaje, notaAWav } from "./mensajes.mjs";
+import { cargarEnv, clasificarMensaje, notaAWav, wavAOggOpus } from "./mensajes.mjs";
 import { debeReintentar, esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs";
 
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
@@ -221,12 +221,36 @@ const buscarGrupo = async () => {
   return grupoJid;
 };
 
-const enviarAlGrupo = async (texto) => {
+const jidDelGrupo = async () => {
   const jid = grupoJid ?? (await buscarGrupo());
   if (!jid) throw new Error(`No hay grupo "${GRUPO || "(WHATSAPP_GRUPO vacío)"}"`);
-  await cliente.socket.sendMessage(jid, { text: texto });
+  return jid;
+};
+
+const enviarAlGrupo = async (texto) => {
+  await cliente.socket.sendMessage(await jidDelGrupo(), { text: texto });
   log("Mensaje enviado al grupo");
 };
+
+const enviarNotaDeVoz = async (wav, texto) => {
+  const jid = await jidDelGrupo();
+  if (texto) await cliente.socket.sendMessage(jid, { text: texto });
+  const ogg = await wavAOggOpus(wav);
+  await cliente.socket.sendMessage(jid, { audio: ogg, mimetype: "audio/ogg; codecs=opus", ptt: true });
+  log("Nota de voz enviada al grupo");
+};
+
+const enviarImagen = async (imagen, texto) => {
+  await cliente.socket.sendMessage(await jidDelGrupo(), { image: imagen, caption: texto || undefined });
+  log("Imagen enviada al grupo");
+};
+
+// Rutas para mandar archivos al grupo: el cuerpo trae el archivo en base64
+const RUTAS_ARCHIVO = {
+  "/enviar-audio": { campo: "audio_wav_b64", enviar: enviarNotaDeVoz },
+  "/enviar-imagen": { campo: "imagen_b64", enviar: enviarImagen },
+};
+const MAX_ARCHIVO = 6 * 1024 * 1024;
 
 /** Guarda en el bot un mensaje para la persona y confirma en el grupo. */
 const guardarParaLaPersona = async (msg, info) => {
@@ -282,12 +306,12 @@ const responder = (res, codigo, cuerpo) => {
   res.end(JSON.stringify(cuerpo));
 };
 
-const leerJson = (req) =>
+const leerJson = (req, maximo = 4096) =>
   new Promise((resolve, reject) => {
     let texto = "";
     req.on("data", (parte) => {
       texto += parte;
-      if (texto.length > 4096) reject(new Error("Petición demasiado grande"));
+      if (texto.length > maximo) reject(new Error("Petición demasiado grande"));
     });
     req.on("end", () => {
       try {
@@ -308,6 +332,18 @@ const servidor = createServer(async (req, res) => {
     marcando = false;
     log(llamada ? "Llamada colgada a mano" : "No había llamada; se libera el puente");
     return responder(res, 200, { mensaje: llamada ? "Llamada colgada" : "No había llamada en curso" });
+  }
+  if (req.method === "POST" && RUTAS_ARCHIVO[req.url]) {
+    const { campo, enviar } = RUTAS_ARCHIVO[req.url];
+    try {
+      const cuerpo = await leerJson(req, MAX_ARCHIVO);
+      if (typeof cuerpo[campo] !== "string") return responder(res, 400, { error: `Falta ${campo}` });
+      await enviar(Buffer.from(cuerpo[campo], "base64"), String(cuerpo.texto || "").slice(0, 1000));
+      return responder(res, 200, { enviado: true });
+    } catch (error) {
+      log("No se pudo enviar al grupo:", error.message);
+      return responder(res, 502, { error: error.message });
+    }
   }
   if (req.method === "POST" && req.url === "/enviar") {
     try {

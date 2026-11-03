@@ -30,6 +30,7 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.turns.user_mute import FunctionCallUserMuteStrategy
 from pipecat.workers.runner import WorkerRunner
 
+from compania.agente.grabadora import Grabadora
 from compania.agente.herramientas import Sesion
 from compania.agente.instrucciones import construir_instrucciones
 from compania.dominio import bienestar
@@ -199,7 +200,15 @@ async def run_bot(
         recordatorio_de_la_llamada=recordatorio,
         ahora=datetime.now(),
     )
-    sesion = Sesion(repo, persona.id, aviso=aviso_desde_entorno(), trato=persona.trato, motivo=recordatorio)
+    grabadora = Grabadora()
+    sesion = Sesion(
+        repo,
+        persona.id,
+        aviso=aviso_desde_entorno(),
+        trato=persona.trato,
+        motivo=recordatorio,
+        grabadora=grabadora,
+    )
     llm = crear_servicio_voz(instrucciones, sesion.esquemas())
     logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal}")
 
@@ -215,7 +224,10 @@ async def run_bot(
             user_mute_strategies=[FunctionCallUserMuteStrategy()],
         ),
     )
-    pipeline = Pipeline([transport.input(), user_aggregator, llm, transport.output(), assistant_aggregator])
+    # La grabadora va antes del agregador: así escucha a la persona aunque el modelo esté en silencio
+    pipeline = Pipeline(
+        [transport.input(), grabadora, user_aggregator, llm, transport.output(), assistant_aggregator]
+    )
     frecuencias = (
         {"audio_in_sample_rate": frecuencia_audio, "audio_out_sample_rate": frecuencia_audio}
         if frecuencia_audio

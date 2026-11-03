@@ -15,6 +15,7 @@ from loguru import logger
 from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import OutputAudioRawFrame
 
+from compania.agente.grabadora import Grabadora, tono
 from compania.dominio import bienestar
 from compania.dominio.agenda import Agenda
 from compania.dominio.alertas import LINEA_DE_LA_VIDA, instruccion_para_nivel
@@ -83,6 +84,7 @@ class Sesion:
         trato: str = "la persona",
         agenda: Agenda | None = None,
         motivo: str = "",
+        grabadora: Grabadora | None = None,
         reloj: Callable[[], datetime] = datetime.now,
     ) -> None:
         self.repo = repo
@@ -92,6 +94,8 @@ class Sesion:
         self.consentimiento = bool(persona and persona.consentimiento)
         # Texto del recordatorio si la llamada es solo para recordar algo
         self.motivo = motivo
+        self.grabadora = grabadora
+        self.notas_enviadas: list[str] = []
         self.agenda = agenda or Agenda.desde(repo.mensajes_pendientes(persona_id))
         self.aviso = aviso or SinAviso()
         self.trato = trato
@@ -346,6 +350,41 @@ class Sesion:
             self.seguimientos_cerrados.append(f"{abiertos[seguimiento_id].para}: {resultado}")
         await params.result_callback({"cerrado": ok})
 
+    async def grabar_mensaje_de_voz(self, params: ParametrosLlamada) -> None:
+        """Graba lo que la persona le quiere decir a su familia y lo manda como nota de voz."""
+        para = str(params.arguments.get("para") or "la familia").strip()
+        if self.grabadora is None:
+            await params.result_callback(
+                {
+                    "error": "no disponible",
+                    "que_hacer": "Toma su mensaje en texto con enviar_mensaje_a_familia.",
+                }
+            )
+            return
+        frecuencia = self.grabadora.frecuencia
+        await params.llm.push_frame(OutputAudioRawFrame(tono(frecuencia), frecuencia, 1))
+        await asyncio.sleep(0.5)
+        grabado = await self.grabadora.grabar()
+        if grabado is None:
+            await params.result_callback(
+                {
+                    "enviado": False,
+                    "que_decir": "Dile que no alcanzaste a escucharle y pregúntale si quiere intentarlo otra vez.",
+                }
+            )
+            return
+        wav, _ = grabado
+        enviado = await self.aviso.enviar_audio(
+            wav, _frase(f"{self.trato} le manda esta nota de voz a {para}")
+        )
+        if enviado:
+            self.notas_enviadas.append(para)
+        await params.result_callback(
+            {"enviado": enviado}
+            if enviado
+            else {"enviado": False, "que_decir": "Dile que se lo harás llegar después."}
+        )
+
     async def generar_alerta(self, params: ParametrosLlamada) -> None:
         nivel = NivelAlerta(str(params.arguments["nivel"]))
         alerta = self.repo.guardar_alerta(Alerta(self.persona_id, nivel, str(params.arguments["motivo"])))
@@ -372,6 +411,7 @@ class Sesion:
             or self.recordatorios_creados
             or self.alertas
             or self.pedidos_de_llamada
+            or self.notas_enviadas
             or self.seguimientos_cerrados
         )
 
@@ -398,6 +438,8 @@ class Sesion:
                 f"Jugamos {_cuantos(self.juegos_jugados, 'juego', 'juegos')} de memoria y "
                 f"le atinó a {self.aciertos}."
             )
+        if self.notas_enviadas:
+            partes.append(f"Les mandó una nota de voz a {_lista(list(dict.fromkeys(self.notas_enviadas)))}.")
         if self.pedidos_de_llamada:
             partes.append(f"Tiene ganas de platicar con {_lista(self.pedidos_de_llamada)}; ya se lo avisé.")
         for cerrado in self.seguimientos_cerrados:
@@ -588,6 +630,17 @@ class Sesion:
                 },
                 required=["seguimiento_id", "resultado"],
                 handler=self.cerrar_seguimiento,
+            ),
+            FunctionSchema(
+                name="grabar_mensaje_de_voz",
+                description=(
+                    "Graba con su propia voz el mensaje que la persona le quiere mandar a alguien de su "
+                    "familia y lo manda al grupo como nota de voz. Antes dile que hable después del tonito "
+                    "y que al terminar se quede callada un momento."
+                ),
+                properties={"para": {"type": "string", "description": "Primer nombre del familiar"}},
+                required=["para"],
+                handler=self.grabar_mensaje_de_voz,
             ),
             FunctionSchema(
                 name="generar_alerta",

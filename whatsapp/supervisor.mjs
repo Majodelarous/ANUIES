@@ -95,7 +95,7 @@ const leer = (req) =>
     let texto = "";
     req.on("data", (p) => {
       texto += p;
-      if (texto.length > 8192) reject(new Error("Petición demasiado grande"));
+      if (texto.length > 6 * 1024 * 1024) reject(new Error("Petición demasiado grande"));
     });
     req.on("end", () => resolve(texto));
   });
