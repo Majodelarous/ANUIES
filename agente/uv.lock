@@ -678,17 +678,10 @@ name = "compania-voz"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pipecat-ai", extra = ["google", "runner", "webrtc", "websocket"] },
-    { name = "python-dotenv" },
-]
-
-[package.optional-dependencies]
-nova = [
     { name = "boto3" },
-    { name = "pipecat-ai", extra = ["aws-nova-sonic"] },
-]
-telefonia = [
+    { name = "pipecat-ai", extra = ["aws-nova-sonic", "google", "runner", "webrtc", "websocket"] },
     { name = "pipecat-asterisk" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -701,13 +694,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "boto3", marker = "extra == 'nova'", specifier = ">=1.35" },
-    { name = "pipecat-ai", extras = ["aws-nova-sonic"], marker = "extra == 'nova'", specifier = ">=1.15,<2" },
-    { name = "pipecat-ai", extras = ["google", "runner", "silero", "webrtc", "websocket"], specifier = ">=1.15,<2" },
-    { name = "pipecat-asterisk", marker = "extra == 'telefonia'", specifier = ">=0.1.4,<0.2" },
+    { name = "boto3", specifier = ">=1.35" },
+    { name = "pipecat-ai", extras = ["aws-nova-sonic", "google", "runner", "silero", "webrtc", "websocket"], specifier = ">=1.15,<2" },
+    { name = "pipecat-asterisk", specifier = ">=0.1.4,<0.2" },
     { name = "python-dotenv", specifier = ">=1.0" },
 ]
-provides-extras = ["nova", "telefonia"]
 
 [package.metadata.requires-dev]
 dev = [

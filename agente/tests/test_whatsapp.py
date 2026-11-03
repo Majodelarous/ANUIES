@@ -41,3 +41,28 @@ def test_solicitud_al_puente():
 def test_rechaza_numero_corto():
     with pytest.raises(ValueError):
         solicitud_llamada("12345")
+
+
+def test_motor_inexistente_falla_al_arrancar(monkeypatch):
+    from compania.agente.bot import verificar_motor
+
+    monkeypatch.setenv("MOTOR_VOZ", "otro")
+    with pytest.raises(SystemExit):
+        verificar_motor()
+
+
+def test_gemini_sin_llave_falla_al_arrancar(monkeypatch):
+    from compania.agente.bot import verificar_motor
+
+    monkeypatch.setenv("MOTOR_VOZ", "gemini")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    with pytest.raises(SystemExit, match="GOOGLE_API_KEY"):
+        verificar_motor()
+
+
+def test_nova_instalado(monkeypatch):
+    import compania.agente.bot as bot
+
+    monkeypatch.setenv("MOTOR_VOZ", "nova")
+    monkeypatch.setattr(bot, "credenciales_aws", lambda: {})
+    assert bot.verificar_motor() == "nova"

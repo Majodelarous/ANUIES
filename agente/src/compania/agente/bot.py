@@ -97,6 +97,32 @@ def crear_servicio_voz(instrucciones: str, herramientas: list):
     return GeminiLiveLLMService(api_key=os.environ["GOOGLE_API_KEY"], settings=ajustes, tools=herramientas)
 
 
+def verificar_motor() -> str:
+    """Revisa al arrancar que el motor de voz elegido esté instalado y configurado.
+
+    Así el error aparece en la terminal del bot y no cuando la persona ya contestó.
+    """
+    motor = os.getenv("MOTOR_VOZ", "gemini").lower()
+    try:
+        if motor == "nova":
+            from pipecat.services.aws.nova_sonic.llm import AWSNovaSonicLLMService  # noqa: F401
+
+            credenciales_aws()
+        elif motor == "gemini":
+            from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService  # noqa: F401
+
+            if not os.getenv("GOOGLE_API_KEY"):
+                raise RuntimeError("Falta GOOGLE_API_KEY en .env")
+        else:
+            raise RuntimeError(f"MOTOR_VOZ={motor!r} no existe; usa gemini o nova")
+    except ImportError as error:
+        raise SystemExit(f"Falta instalar el motor {motor}: ejecuta uv sync ({error})") from None
+    except Exception as error:
+        raise SystemExit(f"El motor de voz {motor} no está listo: {error}") from None
+    logger.info(f"Motor de voz: {motor}")
+    return motor
+
+
 def _canal(runner_args: RunnerArguments) -> str:
     return "web" if isinstance(runner_args, SmallWebRTCRunnerArguments) else "telefono"
 

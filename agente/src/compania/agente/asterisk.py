@@ -50,7 +50,10 @@ def crear_app() -> FastAPI:
 def main() -> None:
     import uvicorn
 
+    from compania.agente.bot import verificar_motor
+
     load_dotenv(override=True)
+    verificar_motor()
     uvicorn.run(crear_app(), host="127.0.0.1", port=int(os.getenv("ASTERISK_BOT_PUERTO", "7862")))
 
 
