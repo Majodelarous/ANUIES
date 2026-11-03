@@ -37,4 +37,5 @@
 - [x] T22 Recordatorios a su hora con una llamada corta (probado en llamada real el 2026-11-03)
 - [x] T23 Consentimiento de palabra en la primera llamada; sin permiso no se guardan recuerdos ni respuestas de bienestar (probado en llamada real el 2026-11-03)
 - [~] T16 (hecho en la rama ideas; falta probar en llamada real) Imágenes de buenos días: Rous ofrece mandar al grupo una imagen de saludo original de parte de la persona
+- [~] T16b (rama ideas; falta probar con la abue y decidir con Majo si se queda) Imágenes parecidas tipo Google Lens: si la abue le manda una imagen a Rous por WhatsApp, Rous entiende qué muestra (Gemini), aprende el tema que le gusta y le regresa a su chat 3 imágenes parecidas buscadas en internet (ddgs con Bing) para que ella las reenvíe. En la llamada, buscar_imagenes_para_compartir hace lo mismo con el tema que diga o con sus favoritos; si no hay internet, manda la imagen dibujada de T16
 - [ ] T15 Despliegue en la nube con infraestructura como código

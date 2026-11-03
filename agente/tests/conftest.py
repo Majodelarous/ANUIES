@@ -38,6 +38,7 @@ class AvisoFalso:
         self.enviados: list[str] = []
         self.audios: list[tuple[bytes, str]] = []
         self.imagenes: list[tuple[bytes, str]] = []
+        self.destinos: list[str] = []
 
     async def enviar(self, texto: str) -> bool:
         self.enviados.append(texto)
@@ -47,8 +48,9 @@ class AvisoFalso:
         self.audios.append((wav, texto))
         return self.ok
 
-    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
+    async def enviar_imagen(self, imagen: bytes, texto: str = "", para: str = "") -> bool:
         self.imagenes.append((imagen, texto))
+        self.destinos.append(para)
         return self.ok
 
 

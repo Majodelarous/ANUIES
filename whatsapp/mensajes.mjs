@@ -43,6 +43,28 @@ export const clasificarMensaje = ({ key, pushName, contenido }, grupoJid, prefij
   return { tipo: "texto", de, texto: texto.slice(0, 1000) };
 };
 
+/** Últimos 10 dígitos de un JID o número: ignora el 52/521 de México y el sufijo del servidor. */
+export const ultimos10 = (jid) => String(jid ?? "").split("@")[0].split(":")[0].replace(/\D/g, "").slice(-10);
+
+/**
+ * ¿Es una imagen que mandó la persona mayor? Para buscarle imágenes parecidas (tipo Google Lens).
+ *
+ * WhatsApp puede identificar al remitente por número o por LID (un id anónimo), así que se
+ * revisan todos los campos donde puede venir su número.
+ * Devuelve "privado" (se la mandó a la asistente), "grupo" (la compartió en el grupo) o null.
+ */
+export const imagenDeLaPersona = ({ key, contenido }, numeroPersona, grupoJid = null) => {
+  const persona = ultimos10(numeroPersona);
+  if (!key || key.fromMe || !persona || persona.length < 10 || !contenido?.imageMessage) return null;
+  const enGrupo = String(key.remoteJid || "").endsWith("@g.us");
+  const candidatos = enGrupo
+    ? [key.participant, key.participantAlt, key.participantPn]
+    : [key.remoteJid, key.remoteJidAlt, key.senderPn];
+  if (!candidatos.some((jid) => jid && ultimos10(jid) === persona)) return null;
+  if (enGrupo) return key.remoteJid === grupoJid ? "grupo" : null;
+  return "privado";
+};
+
 /** Arma un WAV (PCM 16 bits, mono) con los tamaños correctos. */
 export const wavDesdePcm = (pcm, frecuencia = 16000) => {
   const cabecera = Buffer.alloc(44);

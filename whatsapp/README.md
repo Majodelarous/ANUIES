@@ -97,7 +97,17 @@ Con `WHATSAPP_GRUPO` en `agente/.env` (nombre exacto del grupo, y el número de 
 
 - Si un mensaje de la familia promete una llamada con hora ("Abue, salgo a las 5 y te marco"), el puente lo confirma en el grupo, a esa hora el programador le recuerda a esa persona que quedó de marcarle, y en la siguiente llamada Rous le pregunta a la abue si le marcó.
 - La abue puede responder con su propia voz: suena un tonito, habla y al quedarse callada la grabación llega al grupo como nota de voz.
-- Rous puede ofrecerle mandar al grupo una imagen de saludo (buenos días, buenas tardes) con su frase y su firma. La imagen se dibuja aquí mismo: es original, sin personajes ni imágenes de internet.
+
+## Imágenes para que la abue las reenvíe (tipo Google Lens)
+
+Con `WHATSAPP_PERSONA` y `GOOGLE_API_KEY` en `agente/.env`:
+
+- Si la persona le manda (o reenvía) una imagen al número de la asistente, Rous contesta "¡Qué bonita! Déjeme buscarle unas parecidas", entiende qué muestra con Gemini (rosas, la Virgen, café...), lo guarda como algo que le gusta y le regresa a su chat 3 imágenes parecidas de internet, con la explicación de cómo reenviarlas.
+- Si la persona comparte una imagen en el grupo de la familia, solo se aprende el tema; no se contesta nada en el grupo.
+- En la llamada, Rous puede ofrecerle buscar imágenes de saludo del tema que ella diga, o de los que ya sabe que le gustan. Le llegan a su WhatsApp y ella elige cuál reenviar.
+- Si no hay internet o no se encuentra nada, se manda una imagen de saludo dibujada aquí mismo.
+
+La búsqueda usa [ddgs](https://pypi.org/project/ddgs/) (MIT, sin llave) con Bing. Las imágenes son de terceros y se usan para el demo; para un producto habría que revisar derechos y usar una API con licencia.
 
 El puente lee `../agente/.env`, así que la configuración está en un solo lugar. Si creas el grupo con el puente encendido, reinícialo para que lo encuentre.
 
@@ -111,6 +121,9 @@ El puente lee `../agente/.env`, así que la configuración está en un solo luga
 | `WHATSAPP_PUENTE_PUERTO` | `7864` | API local del puente |
 | `WHATSAPP_BOT_PUERTO` | `7863` | Bot (websocket `/wa` y `POST /mensajes`) |
 | `DURACION_MAX_MIN` | `15` | Cuelga solo después de N minutos |
+| `WHATSAPP_PERSONA` | vacío | Número de la persona: a su chat llegan las imágenes y de ahí se leen las que manda |
+| `LENTE_MODELO` | `gemini-flash-latest` | Modelo que entiende las imágenes |
+| `LENTE_BUSCADOR` | `bing` | Backend de ddgs para buscar imágenes |
 
 ## Pruebas
 

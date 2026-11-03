@@ -12,6 +12,9 @@ que el puente aún no reproduce.
 
 ``POST /mensajes`` recibe del puente los mensajes que la familia manda por WhatsApp (texto o
 nota de voz ya convertida a WAV) y los guarda para la próxima llamada.
+
+``POST /imagenes/parecidas`` recibe una imagen que mandó la persona, aprende qué le gusta y
+devuelve imágenes parecidas para que el puente se las mande a su chat.
 """
 
 from __future__ import annotations
@@ -53,6 +56,12 @@ class MensajeEntrante(BaseModel):
     audio_wav_b64: str | None = None
 
 
+class ImagenEntrante(BaseModel):
+    imagen_b64: str
+    mime: str = Field(default="image/jpeg", max_length=40)
+    buscar: bool = True
+
+
 class SerializadorPCM(FrameSerializer):
     """PCM crudo de 16 bits y 16 kHz entre el puente de WhatsApp y Pipecat."""
 
@@ -77,11 +86,12 @@ class SerializadorPCM(FrameSerializer):
         return InputAudioRawFrame(audio=bytes(data), num_channels=1, sample_rate=self._frecuencia)
 
 
-def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
+def crear_app(repo=None, carpeta_audios: str | Path | None = None, imagenes=None) -> FastAPI:
     from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
     from compania.agente.bot import run_bot
     from compania.agente.herramientas import cargar_audio
+    from compania.agente.imagenes_parecidas import ImagenesParecidas
     from compania.dominio.compromisos import extraer_compromiso
     from compania.dominio.modelos import Compromiso, MensajeFamiliar, Seguimiento
     from compania.infraestructura.repositorio import Repositorio
@@ -89,15 +99,48 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
     app = FastAPI(title="Compañía por voz: WhatsApp")
     repositorio = repo or Repositorio(os.getenv("RUTA_DB", "compania.db"))
     audios = Path(carpeta_audios or os.getenv("CARPETA_AUDIOS", "audios"))
+    lente = imagenes or ImagenesParecidas(repositorio)
 
-    @app.post("/mensajes")
-    def nuevo_mensaje(mensaje: MensajeEntrante) -> dict:
+    def persona_actual():
         persona_id = os.getenv("PERSONA_ID")
         persona = (
             repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.primera_persona()
         )
         if persona is None or persona.id is None:
             raise HTTPException(404, "No hay persona registrada")
+        return persona
+
+    @app.post("/imagenes/parecidas")
+    async def imagenes_parecidas(entrada: ImagenEntrante) -> dict:
+        from compania.dominio.saludos import texto_para_la_persona
+
+        persona = persona_actual()
+        try:
+            imagen = base64.b64decode(entrada.imagen_b64, validate=True)
+        except binascii.Error:
+            raise HTTPException(422, "Imagen inválida") from None
+        if len(imagen) > MAX_AUDIO_BYTES:
+            raise HTTPException(413, "La imagen es demasiado grande")
+        if not entrada.buscar:
+            descripcion = await lente.aprender(persona.id, imagen, entrada.mime)
+            return {"tema": descripcion.tema if descripcion else None, "imagenes_b64": []}
+        resultado = await lente.parecidas(persona.id, imagen, entrada.mime)
+        tema = resultado.descripcion.tema if resultado.descripcion else None
+        logger.info(f"Imágenes parecidas para {persona.trato}: {len(resultado.imagenes)} ({tema})")
+        texto = (
+            texto_para_la_persona(persona.trato, datetime.now(), parecidas=True)
+            if resultado.imagenes
+            else "Ahorita no encontré imágenes parecidas. Al rato lo vuelvo a intentar."
+        )
+        return {
+            "tema": tema,
+            "texto": texto,
+            "imagenes_b64": [base64.b64encode(i).decode() for i in resultado.imagenes],
+        }
+
+    @app.post("/mensajes")
+    def nuevo_mensaje(mensaje: MensajeEntrante) -> dict:
+        persona = persona_actual()
         if not mensaje.texto.strip() and not mensaje.audio_wav_b64:
             raise HTTPException(422, "El mensaje está vacío")
 

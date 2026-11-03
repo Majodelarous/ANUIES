@@ -3,9 +3,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { describe, it, test } from "node:test";
 
-import { cargarEnv, clasificarMensaje, notaAWav, wavDesdePcm } from "../mensajes.mjs";
+import { cargarEnv, clasificarMensaje, imagenDeLaPersona, notaAWav, wavDesdePcm } from "../mensajes.mjs";
 
 const GRUPO = "123@g.us";
 const msg = (contenido, extra = {}) => ({
@@ -72,4 +72,37 @@ test("convierte un WAV a nota de voz ogg/opus", async () => {
   const pcm = Buffer.alloc(16000 * 2); // 1 s de silencio
   const ogg = await wavAOggOpus(wavDesdePcm(pcm, 16000));
   assert.equal(ogg.toString("ascii", 0, 4), "OggS");
+});
+
+describe("imagenDeLaPersona", () => {
+  const persona = "525550001111";
+  const imagen = { imageMessage: { mimetype: "image/jpeg" } };
+  const grupo = "120363000000000000@g.us";
+
+  it("reconoce la imagen que la persona manda a la asistente, con 52 o 521", () => {
+    const key = { remoteJid: "5215550001111@s.whatsapp.net", fromMe: false };
+    assert.equal(imagenDeLaPersona({ key, contenido: imagen }, persona, grupo), "privado");
+  });
+
+  it("la reconoce aunque WhatsApp use un LID y el número venga aparte", () => {
+    const key = { remoteJid: "1234567890123@lid", remoteJidAlt: "5215550001111@s.whatsapp.net", fromMe: false };
+    assert.equal(imagenDeLaPersona({ key, contenido: imagen }, persona, grupo), "privado");
+  });
+
+  it("en el grupo de la familia solo cuenta si la mandó ella", () => {
+    const deElla = { remoteJid: grupo, participant: "5215550001111@s.whatsapp.net" };
+    const deOtro = { remoteJid: grupo, participant: "5215550000000@s.whatsapp.net" };
+    const otroGrupo = { remoteJid: "999@g.us", participant: "5215550001111@s.whatsapp.net" };
+    assert.equal(imagenDeLaPersona({ key: deElla, contenido: imagen }, persona, grupo), "grupo");
+    assert.equal(imagenDeLaPersona({ key: deOtro, contenido: imagen }, persona, grupo), null);
+    assert.equal(imagenDeLaPersona({ key: otroGrupo, contenido: imagen }, persona, grupo), null);
+  });
+
+  it("ignora textos, mensajes propios, otros números y si no hay persona configurada", () => {
+    const key = { remoteJid: "5215550001111@s.whatsapp.net" };
+    assert.equal(imagenDeLaPersona({ key, contenido: { conversation: "hola" } }, persona), null);
+    assert.equal(imagenDeLaPersona({ key: { ...key, fromMe: true }, contenido: imagen }, persona), null);
+    assert.equal(imagenDeLaPersona({ key: { remoteJid: "5215550000000@s.whatsapp.net" }, contenido: imagen }, persona), null);
+    assert.equal(imagenDeLaPersona({ key, contenido: imagen }, ""), null);
+  });
 });

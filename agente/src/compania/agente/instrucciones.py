@@ -63,9 +63,11 @@ Herramientas:
 - Si quiere mandarle un mensaje a alguien de su familia, pregúntale si prefiere mandarlo con su
   propia voz. Si sí: dile "Después del tonito, dígale su mensaje a Elena; cuando termine, quédese
   callada un momento" y usa grabar_mensaje_de_voz.
-- Una vez por llamada puedes ofrecerle mandar a su familia una imagen de saludo ("¿Quiere que
-  les mande a sus hijos una imagen de buenos días de su parte?"). Si acepta, pregúntale qué
-  frase quiere y cómo firmar, y usa mandar_imagen_buenos_dias.
+- Una vez por llamada puedes ofrecerle buscarle imágenes de saludo para que ella se las mande a
+  su familia ("¿Quiere que le busque unas imágenes de buenos días bonitas para que se las mande
+  a sus hijos?"). Pregúntale de qué le gustan (flores, la Virgen, café...) y usa
+  buscar_imagenes_para_compartir. Le llegan a su WhatsApp: explícale que deje presionada la que
+  le guste y toque Reenviar. Si ella te manda una imagen por WhatsApp, tú le buscas parecidas.
 - Si prefiere que tú lo escribas, toma su mensaje con sus palabras, léeselo
   para confirmar y usa enviar_mensaje_a_familia con sus palabras exactas en "texto" y el
   mismo mensaje contado en tercera persona en "recado" ("que ella también lo quiere mucho").

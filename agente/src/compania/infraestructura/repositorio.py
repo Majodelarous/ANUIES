@@ -97,6 +97,13 @@ CREATE TABLE IF NOT EXISTS compromisos (
     texto TEXT NOT NULL,
     avisado INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS preferencias_imagen (
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    tema TEXT NOT NULL,
+    veces INTEGER NOT NULL DEFAULT 1,
+    actualizado TEXT NOT NULL,
+    PRIMARY KEY (persona_id, tema)
+);
 CREATE TABLE IF NOT EXISTS ejecuciones (
     clave TEXT PRIMARY KEY,
     creado TEXT NOT NULL
@@ -531,3 +538,23 @@ class Repositorio:
         return Compromiso(
             f["persona_id"], f["de"], f["fecha"], f["hora"], f["texto"], bool(f["avisado"]), f["id"]
         )
+
+    # Temas de imágenes que le gustan a la persona
+
+    def sumar_preferencia_imagen(self, persona_id: int, tema: str) -> None:
+        tema = tema.strip().lower()
+        if not tema:
+            return
+        self._db.execute(
+            "INSERT INTO preferencias_imagen (persona_id, tema, veces, actualizado) VALUES (?, ?, 1, ?)"
+            " ON CONFLICT(persona_id, tema) DO UPDATE SET veces = veces + 1, actualizado = excluded.actualizado",
+            (persona_id, tema, datetime.now().isoformat()),
+        )
+        self._db.commit()
+
+    def temas_favoritos(self, persona_id: int, limite: int = 5) -> list[str]:
+        filas = self._db.execute(
+            "SELECT tema FROM preferencias_imagen WHERE persona_id = ? ORDER BY veces DESC, actualizado DESC LIMIT ?",
+            (persona_id, limite),
+        ).fetchall()
+        return [f["tema"] for f in filas]

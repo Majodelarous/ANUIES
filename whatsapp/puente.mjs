@@ -28,7 +28,7 @@ import { VoipClient } from "baileys-caller";
 import WebSocket from "ws";
 
 import { floatAPcm16, normalizarNumero, numeroDeJid, pcm16AFloat } from "./audio.mjs";
-import { cargarEnv, clasificarMensaje, notaAWav, wavAOggOpus } from "./mensajes.mjs";
+import { cargarEnv, clasificarMensaje, imagenDeLaPersona, notaAWav, wavAOggOpus } from "./mensajes.mjs";
 import { debeReintentar, esFinDeLlamada, vigilarLlamada } from "./vigilancia.mjs";
 
 cargarEnv(join(dirname(fileURLToPath(import.meta.url)), "..", "agente", ".env"));
@@ -44,6 +44,7 @@ const BOT_HTTP_URL = `http://127.0.0.1:${BOT_PUERTO}`;
 const DURACION_MAX_MS = Number(process.env.DURACION_MAX_MIN || 15) * 60_000;
 const GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
 const PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
+const PERSONA = (process.env.WHATSAPP_PERSONA || "").replace(/\D/g, "");
 const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 30) * 1000;
 const SIN_RESPUESTA_MS = Number(process.env.WHATSAPP_SIN_RESPUESTA_S || 90) * 1000;
 
@@ -240,9 +241,11 @@ const enviarNotaDeVoz = async (wav, texto) => {
   log("Nota de voz enviada al grupo");
 };
 
-const enviarImagen = async (imagen, texto) => {
-  await cliente.socket.sendMessage(await jidDelGrupo(), { image: imagen, caption: texto || undefined });
-  log("Imagen enviada al grupo");
+/** Al grupo, o al chat de `para` (por ejemplo, el de la persona para que ella la reenvíe). */
+const enviarImagen = async (imagen, texto, para) => {
+  const jid = para ? `${await resolverNumero(normalizarNumero(para))}@s.whatsapp.net` : await jidDelGrupo();
+  await cliente.socket.sendMessage(jid, { image: imagen, caption: texto || undefined });
+  log(para ? "Imagen enviada al chat de la persona" : "Imagen enviada al grupo");
 };
 
 // Rutas para mandar archivos al grupo: el cuerpo trae el archivo en base64
@@ -282,12 +285,60 @@ const guardarParaLaPersona = async (msg, info) => {
   );
 };
 
-const escucharGrupo = () => {
+// --- Imágenes parecidas (tipo Google Lens) --------------------------------------
+
+/**
+ * La persona manda una imagen a la asistente: se buscan parecidas y le llegan a su chat para
+ * que ella elija y reenvíe. Si la comparte en el grupo, solo se aprende qué le gusta.
+ */
+const atenderImagen = async (msg, donde) => {
+  const contenido = normalizeMessageContent(msg.message);
+  const imagen = await downloadMediaMessage(msg, "buffer", {}, {
+    reuploadRequest: cliente.socket.updateMediaMessage,
+  });
+  const chat = msg.key.remoteJid;
+  if (donde === "privado") {
+    await cliente.socket.sendMessage(chat, { text: "¡Qué bonita! Déjeme buscarle unas parecidas." }, { quoted: msg });
+  }
+  const respuesta = await fetch(`${BOT_HTTP_URL}/imagenes/parecidas`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      imagen_b64: imagen.toString("base64"),
+      mime: contenido.imageMessage.mimetype || "image/jpeg",
+      buscar: donde === "privado",
+    }),
+  });
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) throw new Error(datos.detail || `el bot respondió ${respuesta.status}`);
+  log(`Imagen de la persona (${donde}): tema "${datos.tema ?? "?"}", ${datos.imagenes_b64?.length ?? 0} parecidas`);
+  if (donde !== "privado") return;
+  for (const b64 of datos.imagenes_b64 ?? []) {
+    await cliente.socket.sendMessage(chat, { image: Buffer.from(b64, "base64") });
+  }
+  if (datos.texto) await cliente.socket.sendMessage(chat, { text: datos.texto });
+};
+
+const escucharMensajes = () => {
   cliente.socket.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify" || !grupoJid) return;
+    if (type !== "notify") return;
     for (const msg of messages) {
+      const contenido = normalizeMessageContent(msg.message);
+      const donde = imagenDeLaPersona({ key: msg.key, contenido }, PERSONA, grupoJid);
+      if (donde) {
+        atenderImagen(msg, donde).catch((error) => {
+          log("No se pudieron buscar imágenes parecidas:", error.message);
+          if (donde === "privado") {
+            cliente.socket
+              .sendMessage(msg.key.remoteJid, { text: "Ahorita no pude buscar imágenes. Al rato lo vuelvo a intentar." })
+              .catch(() => {});
+          }
+        });
+        continue;
+      }
+      if (!grupoJid) continue;
       const info = clasificarMensaje(
-        { key: msg.key, pushName: msg.pushName, contenido: normalizeMessageContent(msg.message) },
+        { key: msg.key, pushName: msg.pushName, contenido },
         grupoJid,
         PREFIJO,
       );
@@ -338,7 +389,8 @@ const servidor = createServer(async (req, res) => {
     try {
       const cuerpo = await leerJson(req, MAX_ARCHIVO);
       if (typeof cuerpo[campo] !== "string") return responder(res, 400, { error: `Falta ${campo}` });
-      await enviar(Buffer.from(cuerpo[campo], "base64"), String(cuerpo.texto || "").slice(0, 1000));
+      const para = typeof cuerpo.para === "string" ? cuerpo.para : "";
+      await enviar(Buffer.from(cuerpo[campo], "base64"), String(cuerpo.texto || "").slice(0, 1000), para);
       return responder(res, 200, { enviado: true });
     } catch (error) {
       log("No se pudo enviar al grupo:", error.message);
@@ -397,10 +449,11 @@ cliente.socket.ws.on("CB:call", (nodo) => {
 });
 if (GRUPO) {
   await buscarGrupo().catch((error) => log("No se pudo leer los grupos:", error.message));
-  escucharGrupo();
 } else {
   log("WHATSAPP_GRUPO vacío: no se escuchan ni se envían mensajes de la familia");
 }
+if (!PERSONA) log("WHATSAPP_PERSONA vacío: no se buscan imágenes parecidas a las que mande la persona");
+escucharMensajes();
 servidor.listen(PUERTO, "127.0.0.1", () => {
   log(`Listo. Puente en http://127.0.0.1:${PUERTO}  (bot: ${BOT_WS_URL})`);
   if (BAJO_SUPERVISOR) process.send({ tipo: "listo" });

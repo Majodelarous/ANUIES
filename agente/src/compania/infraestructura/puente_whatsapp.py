@@ -20,7 +20,9 @@ class AvisoFamilia(Protocol):
 
     async def enviar_audio(self, wav: bytes, texto: str = "") -> bool: ...
 
-    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool: ...
+    async def enviar_imagen(self, imagen: bytes, texto: str = "", para: str = "") -> bool:
+        """Al grupo, o al chat de ``para`` (número con código de país) si se indica."""
+        ...
 
 
 class SinAviso:
@@ -34,8 +36,8 @@ class SinAviso:
         logger.info(f"Nota de voz para la familia (sin grupo configurado): {len(wav)} bytes")
         return False
 
-    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
-        logger.info(f"Imagen para la familia (sin grupo configurado): {len(imagen)} bytes")
+    async def enviar_imagen(self, imagen: bytes, texto: str = "", para: str = "") -> bool:
+        logger.info(f"Imagen para {para or 'la familia'} (sin grupo configurado): {len(imagen)} bytes")
         return False
 
 
@@ -69,10 +71,11 @@ class PuenteWhatsApp:
             "/enviar-audio", {"audio_wav_b64": base64.b64encode(wav).decode(), "texto": texto}
         )
 
-    async def enviar_imagen(self, imagen: bytes, texto: str = "") -> bool:
-        return await self._enviar(
-            "/enviar-imagen", {"imagen_b64": base64.b64encode(imagen).decode(), "texto": texto}
-        )
+    async def enviar_imagen(self, imagen: bytes, texto: str = "", para: str = "") -> bool:
+        cuerpo = {"imagen_b64": base64.b64encode(imagen).decode(), "texto": texto}
+        if para:
+            cuerpo["para"] = para
+        return await self._enviar("/enviar-imagen", cuerpo)
 
 
 def aviso_desde_entorno() -> AvisoFamilia:

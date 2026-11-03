@@ -17,6 +17,7 @@ from pipecat.frames.frames import OutputAudioRawFrame
 
 from compania.agente.grabadora import Grabadora, tono
 from compania.agente.imagenes import dibujar
+from compania.agente.imagenes_parecidas import ImagenesParecidas
 from compania.dominio import bienestar
 from compania.dominio.agenda import Agenda
 from compania.dominio.alertas import LINEA_DE_LA_VIDA, instruccion_para_nivel
@@ -29,6 +30,7 @@ from compania.dominio.modelos import (
     RespuestaBienestar,
     Seguimiento,
 )
+from compania.dominio.saludos import texto_para_la_persona
 from compania.infraestructura.puente_whatsapp import AvisoFamilia, SinAviso
 from compania.infraestructura.repositorio import Repositorio
 
@@ -86,6 +88,7 @@ class Sesion:
         agenda: Agenda | None = None,
         motivo: str = "",
         grabadora: Grabadora | None = None,
+        imagenes: ImagenesParecidas | None = None,
         reloj: Callable[[], datetime] = datetime.now,
     ) -> None:
         self.repo = repo
@@ -93,6 +96,9 @@ class Sesion:
         self.reloj = reloj
         persona = repo.obtener_persona(persona_id)
         self.consentimiento = bool(persona and persona.consentimiento)
+        # Su WhatsApp, para mandarle imágenes que ella reenvía
+        self.telefono = (persona.telefono if persona else None) or os.getenv("WHATSAPP_PERSONA", "")
+        self.imagenes = imagenes or ImagenesParecidas(repo)
         # Texto del recordatorio si la llamada es solo para recordar algo
         self.motivo = motivo
         self.grabadora = grabadora
@@ -387,22 +393,34 @@ class Sesion:
             else {"enviado": False, "que_decir": "Dile que se lo harás llegar después."}
         )
 
-    async def mandar_imagen_buenos_dias(self, params: ParametrosLlamada) -> None:
-        """Manda al grupo una imagen de saludo (original, generada aquí) de parte de la persona."""
+    async def buscar_imagenes_para_compartir(self, params: ParametrosLlamada) -> None:
+        """Busca imágenes de saludo y las manda al chat de la persona para que ella las reenvíe."""
         if self.imagen_enviada:
             await params.result_callback(
-                {"enviado": False, "que_decir": "Dile que ya mandaron una imagen hoy."}
+                {"enviado": False, "que_decir": "Dile que ya le mandaste imágenes hoy a su WhatsApp."}
             )
             return
-        mensaje = str(params.arguments.get("mensaje") or "Que tengan un bonito día").strip()[:120]
-        firma = str(params.arguments.get("firma") or self.trato).strip()[:60]
-        imagen = await asyncio.to_thread(dibujar, mensaje, firma)
-        enviado = await self.aviso.enviar_imagen(imagen, _frase(f"De parte de {firma}, con cariño"))
+        tema = str(params.arguments.get("tema") or "").strip()[:60]
+        ahora = datetime.now()
+        imagenes = (await self.imagenes.del_dia(self.persona_id, ahora, tema)).imagenes
+        if not imagenes:
+            # Sin internet o sin resultados: una imagen dibujada aquí, para no quedar mal
+            imagenes = [await asyncio.to_thread(dibujar, "Que tengan un bonito día", self.trato, ahora)]
+        texto = texto_para_la_persona(self.trato, ahora)
+        enviado = False
+        for i, imagen in enumerate(imagenes):
+            ok = await self.aviso.enviar_imagen(imagen, texto if i == 0 else "", para=self.telefono)
+            enviado = enviado or ok
         self.imagen_enviada = enviado
         await params.result_callback(
-            {"enviado": enviado}
+            {
+                "enviado": True,
+                "cuantas": len(imagenes),
+                "que_decir": "Dile que le llegaron a su WhatsApp y que, cuando colguemos, deje "
+                "presionada la que le guste y toque Reenviar para mandarla a su familia.",
+            }
             if enviado
-            else {"enviado": False, "que_decir": "Dile que se la mandarás en cuanto puedas."}
+            else {"enviado": False, "que_decir": "Dile que se las mandarás en cuanto puedas."}
         )
 
     async def generar_alerta(self, params: ParametrosLlamada) -> None:
@@ -460,7 +478,7 @@ class Sesion:
                 f"le atinó a {self.aciertos}."
             )
         if self.imagen_enviada:
-            partes.append("Les mandó una imagen de saludo.")
+            partes.append("Le mandé unas imágenes de saludo a su WhatsApp para que ella se las comparta.")
         if self.notas_enviadas:
             partes.append(f"Les mandó una nota de voz a {_lista(list(dict.fromkeys(self.notas_enviadas)))}.")
         if self.pedidos_de_llamada:
@@ -666,20 +684,21 @@ class Sesion:
                 handler=self.grabar_mensaje_de_voz,
             ),
             FunctionSchema(
-                name="mandar_imagen_buenos_dias",
+                name="buscar_imagenes_para_compartir",
                 description=(
-                    "Manda al grupo de la familia una imagen de saludo (buenos días, buenas tardes) de parte "
-                    "de la persona, con la frase que ella elija. Úsala solo si aceptó; una vez por llamada."
+                    "Busca en internet imágenes de saludo (buenos días, feliz día) con el tema que le "
+                    "gusta y se las manda a su WhatsApp para que ella las reenvíe a su familia. Úsala "
+                    "solo si aceptó; una vez por llamada."
                 ),
                 properties={
-                    "mensaje": {"type": "string", "description": "Frase corta que ella quiere poner"},
-                    "firma": {
+                    "tema": {
                         "type": "string",
-                        "description": "Cómo quiere firmar, por ejemplo 'su abuelita Amada' o 'la abue'",
+                        "description": "Lo que le gusta ver, por ejemplo 'rosas', 'la Virgen', 'café'. "
+                        "Vacío para usar lo que ya sabemos que le gusta.",
                     },
                 },
-                required=["mensaje"],
-                handler=self.mandar_imagen_buenos_dias,
+                required=[],
+                handler=self.buscar_imagenes_para_compartir,
             ),
             FunctionSchema(
                 name="generar_alerta",
