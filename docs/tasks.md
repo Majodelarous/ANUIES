@@ -25,5 +25,6 @@
 
 - [x] T14 Grupo de WhatsApp de la familia: resumen al terminar cada llamada, alertas de atención y crisis al momento, notas de voz y textos ("Abue, ...") que se entregan en la llamada, respuesta de la persona al grupo (probado el 2026-11-02: notas de voz, respuestas y resumen llegan al grupo)
 - [ ] T17 Respuesta de la persona como nota de voz con su propia voz (grabar lo que dicta en la llamada y mandarlo al grupo como audio, en lugar de texto) (pendiente)
+- [ ] T18 Puente con la familia: tras platicar de alguien (por ejemplo, su hija Elena), la asistente ofrece comunicarle con esa persona. Versión 1: avisa al grupo que la abue quiere platicar y le pide a esa persona que le marque. Versión 2: revisa la disponibilidad (agenda) y conecta la llamada. En la siguiente llamada pregunta cómo le fue. Responde al hallazgo de que la asistente debe ser puente y no sustituto (pendiente)
 - [ ] T16 Imágenes de buenos días: ayudar a la persona a conseguir y mandar sus imágenes al grupo (pendiente)
 - [ ] T15 Despliegue en la nube con infraestructura como código
