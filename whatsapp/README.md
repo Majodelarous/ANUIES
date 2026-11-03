@@ -61,6 +61,19 @@ El número va con código de país y solo dígitos. El puente verifica con Whats
 
 El celular de la asistente no necesita estar prendido todo el tiempo, pero WhatsApp cierra los dispositivos vinculados si el celular principal pasa mucho tiempo sin conectarse.
 
+## Llamadas programadas y recordatorios
+
+Con el bot y el puente encendidos, en otra terminal:
+
+```bash
+cd agente && uv run compania-programador
+```
+
+- Llama todos los días a las horas que la familia pone en el panel ("Horario de llamada").
+- A la hora de cada recordatorio hace una llamada corta solo para recordarlo, salvo que haya una llamada diaria a menos de 30 minutos (ahí Rous ya lo menciona).
+- Si nadie contesta, vuelve a marcar a los 10 minutos. Si tampoco contestan, avisa al grupo y deja una alerta informativa en el panel. Si el puente está apagado no avisa a la familia, porque no fue culpa de la persona.
+- El número de la persona se registra con `compania-semilla --telefono`; si falta, usa `WHATSAPP_PERSONA`.
+
 ## Un proceso nuevo por llamada
 
 `npm start` arranca un supervisor que atiende el puerto 7864 y levanta el puente como proceso hijo. Al terminar cada llamada el puente se cierra y el supervisor lo vuelve a levantar limpio (unos 20 segundos).

@@ -17,7 +17,7 @@ from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from compania.dominio import bienestar
-from compania.dominio.modelos import MensajeFamiliar, NivelAlerta, Recordatorio, Semaforo
+from compania.dominio.modelos import Horario, MensajeFamiliar, NivelAlerta, Recordatorio, Semaforo
 from compania.infraestructura.repositorio import Repositorio
 
 CSS = (Path(__file__).parent / "estilos.css").read_text(encoding="utf-8")
@@ -112,6 +112,7 @@ def crear_app(repo: Repositorio | None = None) -> FastAPI:
             "alertas": list(reversed(alertas)),
             "llamadas": repo.llamadas(persona.id, limite=30),
             "recordatorios": repo.recordatorios_activos(persona.id),
+            "horarios": repo.horarios(persona.id),
             "mensajes": repo.mensajes_pendientes(persona.id),
             "recuerdos": [r for r in repo.buscar_recuerdos(persona.id, limite=50) if r.compartir_con_familia],
         }
@@ -147,6 +148,20 @@ def crear_app(repo: Repositorio | None = None) -> FastAPI:
             raise HTTPException(422, "La hora debe tener formato HH:MM")
         repo.guardar_recordatorio(Recordatorio(persona_id, texto.strip(), hora, "familia"))
         return RedirectResponse(f"/?persona_id={persona_id}#cuidado", status_code=303)
+
+    @app.post("/horarios")
+    def nuevo_horario(persona_id: int = Form(...), hora: str = Form(...)):
+        persona_o_404(persona_id)
+        if len(hora) != 5 or hora[2] != ":":
+            raise HTTPException(422, "La hora debe tener formato HH:MM")
+        repo.guardar_horario(Horario(persona_id, hora))
+        return RedirectResponse(f"/?persona_id={persona_id}#llamadas", status_code=303)
+
+    @app.post("/horarios/{horario_id}/quitar")
+    def quitar_horario(horario_id: int, persona_id: int = Form(...)):
+        persona_o_404(persona_id)
+        repo.desactivar_horario(horario_id, persona_id)
+        return RedirectResponse(f"/?persona_id={persona_id}#llamadas", status_code=303)
 
     @app.post("/mensajes")
     def nuevo_mensaje(persona_id: int = Form(...), de: str = Form(...), texto: str = Form(...)):
@@ -200,6 +215,21 @@ def pagina(datos: dict) -> str:
     )
 
     pid = persona.id
+    horarios = (
+        "".join(
+            f'<li><span class="num">{e(h.hora)}</span> todos los días '
+            f'<form class="en-linea" method="post" action="/horarios/{h.id}/quitar">'
+            f'<input type="hidden" name="persona_id" value="{pid}">'
+            f'<button type="submit" class="secundario">Quitar</button></form></li>'
+            for h in datos["horarios"]
+        )
+        or '<li class="vacio">Sin horario: las llamadas se hacen a mano.</li>'
+    )
+    permiso = (
+        f"Aceptó que Rous recuerde lo que cuenta y comparta un resumen desde el {_fecha_corta(persona.consentimiento)}."
+        if persona.consentimiento
+        else "Rous le pedirá permiso en la próxima llamada antes de guardar recuerdos."
+    )
     return f"""<!doctype html>
 <html lang="es-MX"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -218,8 +248,15 @@ def pagina(datos: dict) -> str:
 </div>
 </div></section>
 
-<section class="banda"><div class="contenido">
+<section class="banda" id="llamadas"><div class="contenido">
 <h2>Llamadas</h2>
+<p class="nota">{e(permiso)}</p>
+<h3>Horario de llamada</h3>
+<ul class="lista">{horarios}</ul>
+<form method="post" action="/horarios">
+<input type="hidden" name="persona_id" value="{pid}">
+<label>Que Rous le llame todos los días a las<input name="hora" type="time" required></label>
+<button type="submit">Agregar horario</button></form>
 {_linea_de_llamadas(dias, hoy)}
 <table><thead><tr><th>Fecha</th><th>Canal</th><th class="num">Duración</th></tr></thead>
 <tbody>{filas_llamadas}</tbody></table>

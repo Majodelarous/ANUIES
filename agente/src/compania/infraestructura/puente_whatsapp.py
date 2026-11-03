@@ -53,3 +53,31 @@ def aviso_desde_entorno() -> AvisoFamilia:
     if not os.getenv("WHATSAPP_GRUPO"):
         return SinAviso()
     return PuenteWhatsApp(int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864")))
+
+
+class PuenteLlamadas:
+    """Pide llamadas al puente de WhatsApp y consulta cómo terminó la última."""
+
+    def __init__(self, puerto: int = 7864, timeout: float = 120):
+        self.base = f"http://127.0.0.1:{puerto}"
+        self.timeout = timeout
+
+    def _pedir(self, metodo: str, ruta: str, cuerpo: dict | None = None) -> tuple[int, dict]:
+        datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
+        solicitud = urllib.request.Request(
+            self.base + ruta, data=datos, method=metodo, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(solicitud, timeout=self.timeout) as respuesta:
+                return respuesta.status, json.loads(respuesta.read() or b"{}")
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read() or b"{}")
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            return 0, {"error": f"El puente no responde: {error}"}
+
+    async def llamar(self, numero: str, motivo: str) -> tuple[int, dict]:
+        return await asyncio.to_thread(self._pedir, "POST", "/llamar", {"numero": numero, "motivo": motivo})
+
+    async def ultima_llamada(self) -> dict:
+        _, datos = await asyncio.to_thread(self._pedir, "GET", "/ultima-llamada")
+        return datos

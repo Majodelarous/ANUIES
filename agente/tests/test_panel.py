@@ -42,3 +42,19 @@ def test_hora_invalida(repo, persona):
         "/recordatorios", data={"persona_id": persona.id, "texto": "x", "hora": "2pm"}
     )
     assert r.status_code == 422
+
+
+def test_horario_de_llamada_desde_el_panel(repo, persona):
+    from fastapi.testclient import TestClient
+
+    from compania.panel.app import crear_app
+
+    cliente = TestClient(crear_app(repo))
+    r = cliente.post("/horarios", data={"persona_id": persona.id, "hora": "17:30"}, follow_redirects=False)
+    assert r.status_code == 303
+    [horario] = repo.horarios(persona.id)
+    html = cliente.get("/").text
+    assert "17:30" in html and "Quitar" in html
+    cliente.post(f"/horarios/{horario.id}/quitar", data={"persona_id": persona.id})
+    assert repo.horarios(persona.id) == []
+    assert "Sin horario" in cliente.get("/").text

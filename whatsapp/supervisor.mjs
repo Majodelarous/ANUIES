@@ -34,6 +34,8 @@ let puente = null;
 let cerrando = false;
 let caidasSeguidas = 0;
 let reintentoPendiente = null;
+// Resultado de la última llamada, para el programador (sobrevive a los reinicios del puente)
+let ultima = null;
 
 const levantar = () => {
   const inicio = Date.now();
@@ -47,12 +49,20 @@ const levantar = () => {
       caidasSeguidas = 0;
       compuerta.abrir();
       if (reintentoPendiente) {
-        const numero = reintentoPendiente;
+        const pendiente = reintentoPendiente;
         reintentoPendiente = null;
         log("Volviendo a marcar con un puente nuevo");
-        reenviar("POST", "/llamar", JSON.stringify({ numero })).catch((e) => log("Reintento fallido:", e.message));
+        reenviar("POST", "/llamar", JSON.stringify(pendiente)).catch((e) => log("Reintento fallido:", e.message));
       }
+    } else if (m?.tipo === "llamada") {
+      ultima = { callId: m.callId, numero: m.numero, motivo: m.motivo, inicio: Date.now(), contesto: false, terminada: false };
+    } else if (m?.tipo === "contesto") {
+      if (ultima) ultima.contesto = true;
     } else if (m?.tipo === "fin") {
+      if (ultima) {
+        ultima.terminada = !m.reintentar; // si se reintenta, la llamada sigue "en curso"
+        ultima.contesto = ultima.contesto || Boolean(m.contesto);
+      }
       // El puente terminó su llamada y se va a cerrar: lo que llegue espera al siguiente
       compuerta.cerrar();
       if (m.reintentar) reintentoPendiente = m.reintentar;
@@ -95,6 +105,9 @@ const servidor = createServer(async (req, res) => {
     res.writeHead(codigo, { "Content-Type": "application/json; charset=utf-8" });
     res.end(texto);
   };
+  if (req.method === "GET" && req.url === "/ultima-llamada") {
+    return responder(200, JSON.stringify(ultima ?? {}));
+  }
   if (req.method === "GET" && req.url === "/estado" && !compuerta.abierta) {
     return responder(200, JSON.stringify({ conectado: false, reiniciando: true }));
   }

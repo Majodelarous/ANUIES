@@ -118,3 +118,15 @@ footer { border-top: 1px solid var(--linea); padding: var(--e4) 0; color: var(--
   border-radius: 999px;
   font-size: 0.85em;
 }
+
+form.en-linea {
+  display: inline;
+  margin: 0 0 0 0.5rem;
+}
+
+button.secundario {
+  padding: 0.15rem 0.6rem;
+  background: transparent;
+  color: var(--marca);
+  border: 1px solid var(--linea);
+}

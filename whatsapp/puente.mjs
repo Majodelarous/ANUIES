@@ -88,8 +88,8 @@ const resolverNumero = async (digitos) => {
 };
 
 /** Conecta una llamada contestada con el bot. */
-const conectarConBot = (llamada) => {
-  const ws = new WebSocket(BOT_WS_URL);
+const conectarConBot = (llamada, motivo) => {
+  const ws = new WebSocket(`${BOT_WS_URL}?motivo=${encodeURIComponent(motivo)}`);
   let abierto = false;
 
   ws.on("open", () => {
@@ -135,7 +135,11 @@ const conectarConBot = (llamada) => {
   });
 };
 
-const llamar = async (digitos, reintentos = 0) => {
+const avisarSupervisor = (mensaje) => {
+  if (BAJO_SUPERVISOR) process.send(mensaje);
+};
+
+const llamar = async (digitos, reintentos = 0, motivo = "manual") => {
   marcando = true;
   let llamada;
   try {
@@ -147,6 +151,7 @@ const llamar = async (digitos, reintentos = 0) => {
     const numero = await resolverNumero(digitos);
     log(`Llamando a ${numero}...`);
     llamada = await cliente.call(numero, { audioSource: "push", durationMs: DURACION_MAX_MS });
+    avisarSupervisor({ tipo: "llamada", callId: llamada.callId, numero: digitos, motivo });
   } finally {
     marcando = false;
   }
@@ -167,14 +172,18 @@ const llamar = async (digitos, reintentos = 0) => {
 
     if (BAJO_SUPERVISOR) {
       // Proceso nuevo para la siguiente llamada (y para el reintento, si toca)
-      process.send({ tipo: "fin", reintentar: reintentar ? digitos : null });
+      process.send({
+        tipo: "fin",
+        contesto: Boolean(seguimiento.contestoEn),
+        reintentar: reintentar ? { numero: digitos, motivo } : null,
+      });
       setTimeout(() => {
         servidor.close();
         cliente.disconnect();
         process.exit(0);
       }, 1_500);
     } else if (reintentar) {
-      llamar(digitos, reintentos + 1).catch((error) => log("No se pudo reintentar:", error.message));
+      llamar(digitos, reintentos + 1, motivo).catch((error) => log("No se pudo reintentar:", error.message));
     }
   });
   if (DIAGNOSTICO) {
@@ -189,7 +198,8 @@ const llamar = async (digitos, reintentos = 0) => {
   llamada.on("ringing", () => log("Sonando"));
   llamada.on("connected", () => {
     log("Contestó");
-    conectarConBot(llamada);
+    avisarSupervisor({ tipo: "contesto" });
+    conectarConBot(llamada, motivo);
   });
   llamada.on("error", (error) => log("Error en la llamada:", error.message));
   return llamada.callId;
@@ -312,14 +322,17 @@ const servidor = createServer(async (req, res) => {
     return responder(res, 404, { error: "Ruta no encontrada" });
   }
   try {
-    const { numero } = await leerJson(req);
+    const { numero, motivo = "manual" } = await leerJson(req);
+    if (!/^(manual|programada|recordatorio:\d+)$/.test(motivo)) {
+      return responder(res, 400, { error: "Motivo inválido" });
+    }
     const digitos = normalizarNumero(numero);
     if (ocupado()) {
       return responder(res, 409, {
         error: "Ya hay una llamada en curso. Si ya colgaste, usa: uv run compania-llamar-wa --colgar",
       });
     }
-    const callId = await llamar(digitos);
+    const callId = await llamar(digitos, 0, motivo);
     return responder(res, 200, { mensaje: `Llamando por WhatsApp a ${digitos}...`, llamada: callId });
   } catch (error) {
     log("No se pudo llamar:", error.message);
