@@ -5,7 +5,6 @@
 set -euo pipefail
 cuenta="${1:-abue}"
 minutos="${2:-5}"
-puerto="${QR_PUERTO:-8090}"
 cd "$(dirname "$0")"
 
 cuentas="asterisk/pjsip_cuentas.conf"
@@ -15,6 +14,20 @@ clave="$(awk -v c="[$cuenta](auth-app)" '$0==c{f=1;next} /^\[/{f=0} f && /^passw
 
 ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' || true)"
 ip="${ip:-$(hostname -I | awk '{print $1}' || true)}"
+# Primer puerto libre entre 8090 y 8099 (o el de QR_PUERTO)
+puerto="${QR_PUERTO:-$(python3 - "$ip" <<'PY'
+import socket, sys
+for p in range(8090, 8100):
+    with socket.socket() as s:
+        try:
+            s.bind((sys.argv[1], p))
+        except OSError:
+            continue
+        print(p)
+        break
+PY
+)}"
+[[ -n "$puerto" ]] || { echo "No hay puertos libres entre 8090 y 8099; define QR_PUERTO"; exit 1; }
 # Huella de la contraseña (realm por omisión de Asterisk) para no enviar la contraseña en texto
 ha1="$(printf '%s:asterisk:%s' "$cuenta" "$clave" | md5sum | awk '{print $1}')"
 
