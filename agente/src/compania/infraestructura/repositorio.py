@@ -230,23 +230,30 @@ class Repositorio:
         )
         return mensaje
 
+    @staticmethod
+    def _mensaje(f) -> MensajeFamiliar:
+        return MensajeFamiliar(
+            f["persona_id"],
+            f["de"],
+            f["texto"],
+            f["audio"],
+            bool(f["entregado"]),
+            datetime.fromisoformat(f["creado"]),
+            f["id"],
+        )
+
     def mensajes_pendientes(self, persona_id: int) -> list[MensajeFamiliar]:
         filas = self._db.execute(
             "SELECT * FROM mensajes_familia WHERE persona_id = ? AND entregado = 0 ORDER BY creado",
             (persona_id,),
         ).fetchall()
-        return [
-            MensajeFamiliar(
-                f["persona_id"],
-                f["de"],
-                f["texto"],
-                f["audio"],
-                bool(f["entregado"]),
-                datetime.fromisoformat(f["creado"]),
-                f["id"],
-            )
-            for f in filas
-        ]
+        return [self._mensaje(f) for f in filas]
+
+    def obtener_mensaje(self, mensaje_id: int, persona_id: int) -> MensajeFamiliar | None:
+        fila = self._db.execute(
+            "SELECT * FROM mensajes_familia WHERE id = ? AND persona_id = ?", (mensaje_id, persona_id)
+        ).fetchone()
+        return self._mensaje(fila) if fila else None
 
     def marcar_entregado(self, mensaje_id: int, persona_id: int) -> bool:
         cur = self._db.execute(

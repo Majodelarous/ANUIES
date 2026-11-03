@@ -108,3 +108,13 @@ footer { border-top: 1px solid var(--linea); padding: var(--e4) 0; color: var(--
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+.etiqueta {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--linea);
+  color: var(--marca);
+  border-radius: 999px;
+  font-size: 0.85em;
+}

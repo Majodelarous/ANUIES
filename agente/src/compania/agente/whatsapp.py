@@ -9,19 +9,27 @@ Uso::
 Protocolo del websocket ``/wa``: mensajes binarios con PCM de 16 bits, 16 kHz, mono, en ambos
 sentidos. El bot manda el texto ``clear`` cuando la persona interrumpe, para descartar el audio
 que el puente aún no reproduce.
+
+``POST /mensajes`` recibe del puente los mensajes que la familia manda por WhatsApp (texto o
+nota de voz ya convertida a WAV) y los guarda para la próxima llamada.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import json
 import os
 import re
 import urllib.error
 import urllib.request
+import wave
+from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket
 from loguru import logger
 from pipecat.audio.utils import create_stream_resampler
 from pipecat.frames.frames import (
@@ -31,10 +39,18 @@ from pipecat.frames.frames import (
     InterruptionFrame,
 )
 from pipecat.serializers.base_serializer import FrameSerializer
+from pydantic import BaseModel, Field
 
 FRECUENCIA = 16000
 NUMERO = re.compile(r"^\d{10,15}$")
 LIMPIAR = "clear"
+MAX_AUDIO_BYTES = 8 * 1024 * 1024  # unos 4 minutos a 16 kHz
+
+
+class MensajeEntrante(BaseModel):
+    de: str = Field(min_length=1, max_length=60)
+    texto: str = Field(default="", max_length=1000)
+    audio_wav_b64: str | None = None
 
 
 class SerializadorPCM(FrameSerializer):
@@ -61,12 +77,55 @@ class SerializadorPCM(FrameSerializer):
         return InputAudioRawFrame(audio=bytes(data), num_channels=1, sample_rate=self._frecuencia)
 
 
-def crear_app() -> FastAPI:
+def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
     from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
     from compania.agente.bot import run_bot
+    from compania.agente.herramientas import cargar_audio
+    from compania.dominio.modelos import MensajeFamiliar
+    from compania.infraestructura.repositorio import Repositorio
 
     app = FastAPI(title="Compañía por voz: WhatsApp")
+    repositorio = repo or Repositorio(os.getenv("RUTA_DB", "compania.db"))
+    audios = Path(carpeta_audios or os.getenv("CARPETA_AUDIOS", "audios"))
+
+    @app.post("/mensajes")
+    def nuevo_mensaje(mensaje: MensajeEntrante) -> dict:
+        persona_id = os.getenv("PERSONA_ID")
+        persona = (
+            repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.primera_persona()
+        )
+        if persona is None or persona.id is None:
+            raise HTTPException(404, "No hay persona registrada")
+        if not mensaje.texto.strip() and not mensaje.audio_wav_b64:
+            raise HTTPException(422, "El mensaje está vacío")
+
+        ruta = None
+        if mensaje.audio_wav_b64:
+            try:
+                datos = base64.b64decode(mensaje.audio_wav_b64, validate=True)
+            except binascii.Error:
+                raise HTTPException(422, "Audio inválido") from None
+            if len(datos) > MAX_AUDIO_BYTES:
+                raise HTTPException(413, "La nota de voz es demasiado larga")
+            audios.mkdir(parents=True, exist_ok=True)
+            ruta = audios / f"mensaje-{datetime.now():%Y%m%d-%H%M%S-%f}.wav"
+            ruta.write_bytes(datos)
+            try:
+                cargar_audio(ruta)
+            except (ValueError, wave.Error, EOFError):
+                ruta.unlink(missing_ok=True)
+                raise HTTPException(422, "El audio debe ser WAV mono de 16 bits") from None
+
+        guardado = repositorio.guardar_mensaje(
+            MensajeFamiliar(
+                persona.id, mensaje.de.strip(), mensaje.texto.strip(), str(ruta) if ruta else None
+            )
+        )
+        logger.info(
+            f"Mensaje {guardado.id} de {guardado.de} para {persona.trato} ({'voz' if ruta else 'texto'})"
+        )
+        return {"id": guardado.id, "trato": persona.trato}
 
     @app.websocket("/wa")
     async def llamada(websocket: WebSocket) -> None:

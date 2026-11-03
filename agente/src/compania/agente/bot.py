@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -26,11 +27,13 @@ from pipecat.runner.types import RunnerArguments, SmallWebRTCRunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.turns.user_mute import FunctionCallUserMuteStrategy
 from pipecat.workers.runner import WorkerRunner
 
 from compania.agente.herramientas import Sesion
 from compania.agente.instrucciones import construir_instrucciones
 from compania.dominio import bienestar
+from compania.infraestructura.puente_whatsapp import aviso_desde_entorno
 from compania.infraestructura.repositorio import Repositorio
 
 load_dotenv(override=True)
@@ -152,14 +155,18 @@ async def run_bot(
         mensajes=repo.mensajes_pendientes(persona.id),
         preguntas_bienestar=bienestar.elegir_preguntas_del_dia(respuestas),
     )
-    sesion = Sesion(repo, persona.id)
+    sesion = Sesion(repo, persona.id, aviso=aviso_desde_entorno(), trato=persona.trato)
     llm = crear_servicio_voz(instrucciones, sesion.esquemas())
     logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal}")
 
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+            # Silencia el micrófono mientras corre una herramienta, por ejemplo una nota de voz
+            user_mute_strategies=[FunctionCallUserMuteStrategy()],
+        ),
     )
     pipeline = Pipeline([transport.input(), user_aggregator, llm, transport.output(), assistant_aggregator])
     frecuencias = (
@@ -192,6 +199,8 @@ async def run_bot(
     async def on_client_disconnected(transport, client):
         logger.info(f"Fin de la llamada {llamada.id}")
         repo.terminar_llamada(llamada.id)
+        minutos = max(1, round((datetime.now() - llamada.inicio).total_seconds() / 60))
+        await sesion.aviso.enviar(sesion.resumen(minutos))
         await runner.cancel()
 
     await runner.run()

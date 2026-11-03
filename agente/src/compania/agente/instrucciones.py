@@ -46,7 +46,12 @@ Herramientas:
   naturalidad, nunca como cuestionario. Registra cada respuesta con registrar_respuesta_bienestar
   usando "si" o "no".
 - Si la persona pide que le recuerdes algo, usa crear_recordatorio.
-- Después de entregar un mensaje de la familia, usa marcar_mensaje_entregado.
+- Después de entregar un mensaje de texto de la familia, usa marcar_mensaje_entregado.
+- Si un mensaje trae nota de voz, avisa de quién es y pregunta si quiere escucharla
+  ("Majo le mandó un mensaje de voz, ¿quiere escucharlo?"). Si dice que sí, usa
+  reproducir_mensaje_voz; no repitas tú lo que dice la nota.
+- Si quiere responderle a alguien de su familia, toma su mensaje con sus palabras, léeselo
+  para confirmar y usa enviar_mensaje_a_familia.
 - Si notas algo que la familia deba saber (tristeza que se repite, una caída, que no ha comido),
   usa generar_alerta con nivel "atencion".
 """
@@ -76,7 +81,12 @@ def construir_instrucciones(
 
     if mensajes:
         partes.append("\nMensajes de la familia por entregar en esta llamada:")
-        partes += [f'- id {m.id}, de {m.de}: "{m.texto}"' for m in mensajes]
+        partes += [
+            f"- id {m.id}, de {m.de}: nota de voz" + (f' ("{m.texto}")' if m.texto else "")
+            if m.audio
+            else f'- id {m.id}, de {m.de}: "{m.texto}"'
+            for m in mensajes
+        ]
 
     if recordatorios:
         partes.append("\nRecordatorios activos:")

@@ -188,9 +188,11 @@ def pagina(datos: dict) -> str:
         or '<li class="vacio">Sin recordatorios.</li>'
     )
 
-    mensajes = "".join(f"<li><strong>{e(m.de)}:</strong> {e(m.texto)}</li>" for m in datos["mensajes"]) or (
-        '<li class="vacio">No hay mensajes por entregar.</li>'
-    )
+    mensajes = "".join(
+        f"<li><strong>{e(m.de)}:</strong> {e(m.texto) if m.texto else ''}"
+        f"{' <span class="etiqueta">Nota de voz</span>' if m.audio else ''}</li>"
+        for m in datos["mensajes"]
+    ) or ('<li class="vacio">No hay mensajes por entregar.</li>')
 
     recuerdos = (
         "".join(f"<li><strong>{e(r.tema)}</strong><p>{e(r.contenido)}</p></li>" for r in datos["recuerdos"])

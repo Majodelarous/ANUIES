@@ -47,13 +47,27 @@ El número va con código de país y solo dígitos. El puente verifica con Whats
 
 El celular de la asistente no necesita estar prendido todo el tiempo, pero WhatsApp cierra los dispositivos vinculados si el celular principal pasa mucho tiempo sin conectarse.
 
+## Grupo de la familia
+
+Con `WHATSAPP_GRUPO` en `agente/.env` (nombre exacto del grupo, y el número de la asistente dentro del grupo):
+
+- Al terminar cada llamada, la asistente manda al grupo un resumen: duración, recuerdos que la persona quiso compartir, juegos, mensajes recibidos, recordatorios y alertas. Las respuestas de bienestar no se comparten.
+- Las alertas de atención y crisis llegan al momento, durante la llamada.
+- Toda nota de voz que alguien mande al grupo se guarda para la próxima llamada. En la llamada, la asistente pregunta si quiere escucharla y reproduce la voz real; mientras suena, el micrófono de la persona se silencia para que no se corte.
+- Los textos que empiezan con "abue" (`WHATSAPP_PREFIJO`) también se guardan, por ejemplo "Abue, el sábado voy". La plática normal del grupo no se le pasa.
+- Si la persona quiere responder, la asistente confirma el texto y lo manda al grupo.
+
+El puente lee `../agente/.env`, así que la configuración está en un solo lugar. Si creas el grupo con el puente encendido, reinícialo para que lo encuentre.
+
 ## Variables
 
 | Variable | Omisión | Uso |
 |---|---|---|
 | `WA_AUTH_DIR` | `./auth` | Sesión de WhatsApp |
-| `PUENTE_PUERTO` | `7864` | API local del puente |
-| `BOT_WS_URL` | `ws://127.0.0.1:7863/wa` | Websocket del bot |
+| `WHATSAPP_GRUPO` | vacío | Nombre del grupo de la familia |
+| `WHATSAPP_PREFIJO` | `abue` | Textos del grupo que se pasan a la persona |
+| `WHATSAPP_PUENTE_PUERTO` | `7864` | API local del puente |
+| `WHATSAPP_BOT_PUERTO` | `7863` | Bot (websocket `/wa` y `POST /mensajes`) |
 | `DURACION_MAX_MIN` | `15` | Cuelga solo después de N minutos |
 
 ## Pruebas
