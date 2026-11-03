@@ -55,7 +55,7 @@ async def test_consultar_pendientes_y_entregar(repo, persona):
 def test_resumen_avisa_lo_que_quedo_pendiente(repo, persona):
     repo.guardar_mensaje(MensajeFamiliar(persona.id, "Majo", "", "audios/a.wav"))
     texto = Sesion(repo, persona.id, trato="la abue").resumen(3)
-    assert "Quedó pendiente para la próxima llamada: nota de voz de Majo." in texto
+    assert "Me quedó pendiente pasarle lo que le mandó Majo; se lo doy en la próxima llamada." in texto
 
 
 async def test_actividad_de_la_llamada(repo, persona):

@@ -28,11 +28,26 @@ from compania.infraestructura.repositorio import Repositorio
 
 HORA = re.compile(r"^([01]?\d|2[0-3]):[0-5]\d$")
 BLOQUE_SEGUNDOS = 0.2
-NOMBRE_NIVEL = {
-    NivelAlerta.INFORMATIVA: "Aviso",
-    NivelAlerta.ATENCION: "Poner atención",
-    NivelAlerta.CRISIS: "URGENTE",
-}
+
+
+def _frase(texto: str) -> str:
+    """Primera letra en mayúscula y punto final."""
+    texto = texto.strip()
+    if not texto:
+        return ""
+    texto = texto[0].upper() + texto[1:]
+    return texto if texto[-1] in ".!?" else texto + "."
+
+
+def _lista(elementos: list[str]) -> str:
+    """'a', 'a y b', 'a, b y c'."""
+    if len(elementos) <= 1:
+        return "".join(elementos)
+    return ", ".join(elementos[:-1]) + " y " + elementos[-1]
+
+
+def _cuantos(n: int, uno: str, varios: str) -> str:
+    return f"un {uno}" if n == 1 else f"{n} {varios}"
 
 
 def cargar_audio(ruta: str | Path) -> tuple[bytes, int]:
@@ -89,7 +104,7 @@ class Sesion:
             )
         )
         if recuerdo.compartir_con_familia:
-            self.recuerdos_compartidos.append(f"{recuerdo.tema}: {recuerdo.contenido}")
+            self.recuerdos_compartidos.append(recuerdo.contenido)
         await params.result_callback({"guardado": True, "id": recuerdo.id})
 
     async def buscar_recuerdos(self, params: ParametrosLlamada) -> None:
@@ -219,7 +234,7 @@ class Sesion:
     async def enviar_mensaje_a_familia(self, params: ParametrosLlamada) -> None:
         texto = str(params.arguments["texto"]).strip()
         para = str(params.arguments.get("para") or "la familia").strip()
-        enviado = await self.aviso.enviar(f"Mensaje de {self.trato} para {para}: {texto}")
+        enviado = await self.aviso.enviar(f'{self.trato} le manda decir a {para}: "{texto}"')
         await params.result_callback(
             {"enviado": enviado}
             if enviado
@@ -230,11 +245,16 @@ class Sesion:
         nivel = NivelAlerta(str(params.arguments["nivel"]))
         alerta = self.repo.guardar_alerta(Alerta(self.persona_id, nivel, str(params.arguments["motivo"])))
         logger.warning(f"Alerta {nivel.value} para persona {self.persona_id}: {alerta.motivo}")
-        self.alertas.append(f"{NOMBRE_NIVEL[nivel]}: {alerta.motivo}")
+        self.alertas.append(alerta.motivo)
         if nivel != NivelAlerta.INFORMATIVA:
-            aviso = f"{NOMBRE_NIVEL[nivel]} sobre {self.trato}: {alerta.motivo}"
             if nivel == NivelAlerta.CRISIS:
-                aviso += f". Llámenle ahora. Línea de la Vida: {LINEA_DE_LA_VIDA}, 24 horas."
+                aviso = (
+                    f"URGENTE: en la llamada, {self.trato} dijo algo que me preocupa: {_frase(alerta.motivo)} "
+                    f"Por favor llámenle o vayan a verle ahora. Si hay riesgo, la Línea de la Vida atiende "
+                    f"las 24 horas en el {LINEA_DE_LA_VIDA}."
+                )
+            else:
+                aviso = f"Les aviso algo de la llamada con {self.trato}: {_frase(alerta.motivo)} Sería bueno que le llamen hoy."
             await self.aviso.enviar(aviso)
         await params.result_callback({"registrada": True, "que_decir": instruccion_para_nivel(nivel)})
 
@@ -249,31 +269,30 @@ class Sesion:
         )
 
     def resumen(self, minutos: int) -> str:
-        """Texto breve para el grupo de la familia al terminar la llamada."""
-        lineas = [f"Llamada con {self.trato}: {minutos} min."]
+        """Mensaje cálido para el grupo de la familia al terminar la llamada, en un párrafo."""
+        t = self.trato
+        tiempo = "un ratito" if minutos <= 2 else f"unos {minutos} minutos"
+        partes = [f"Hola, familia. Acabo de platicar {tiempo} con {t}."]
         if self.recuerdos_compartidos:
-            lineas.append("Quiso compartirles: " + "; ".join(self.recuerdos_compartidos) + ".")
-        if self.juegos_jugados:
-            lineas.append(f"Juegos de memoria: {self.aciertos} de {self.juegos_jugados} acertados.")
+            partes.append("Les quiso compartir esto: " + " ".join(_frase(r) for r in self.recuerdos_compartidos))
         if self.mensajes_entregados:
-            lineas.append(
-                "Recibió los mensajes de: " + ", ".join(dict.fromkeys(self.mensajes_entregados)) + "."
+            quienes = _lista(list(dict.fromkeys(self.mensajes_entregados)))
+            partes.append(f"Le entregué los mensajes de {quienes}.")
+        if self.juegos_jugados:
+            partes.append(
+                f"Jugamos {_cuantos(self.juegos_jugados, 'juego', 'juegos')} de memoria y "
+                f"le atinó a {self.aciertos}."
             )
         if self.recordatorios_creados:
-            lineas.append("Pidió recordatorios: " + "; ".join(self.recordatorios_creados) + ".")
+            partes.append("Me pidió que le recuerde: " + _lista(self.recordatorios_creados) + ".")
         if self.agenda.pendientes():
-            lineas.append(
-                "Quedó pendiente para la próxima llamada: "
-                + ", ".join(
-                    f"{'nota de voz' if m.audio else 'mensaje'} de {m.de}" for m in self.agenda.pendientes()
-                )
-                + "."
-            )
+            quienes = _lista([m.de for m in self.agenda.pendientes()])
+            partes.append(f"Me quedó pendiente pasarle lo que le mandó {quienes}; se lo doy en la próxima llamada.")
         if self.alertas:
-            lineas.append("Alertas: " + "; ".join(self.alertas) + ".")
+            partes.append("Les pido que estén pendientes: " + " ".join(_frase(a) for a in self.alertas))
         else:
-            lineas.append("Sin alertas.")
-        return "\n".join(lineas)
+            partes.append("Todo tranquilo por hoy.")
+        return " ".join(partes)
 
     def esquemas(self) -> list[FunctionSchema]:
         """Esquemas con sus manejadores, listos para el servicio de voz."""

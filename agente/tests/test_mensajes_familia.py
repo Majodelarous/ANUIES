@@ -70,7 +70,7 @@ async def test_respuesta_de_la_persona_va_al_grupo(repo, persona):
     p = ParametrosFalsos({"texto": "Gracias mija, aquí la espero", "para": "Majo"})
     await Sesion(repo, persona.id, aviso=aviso, trato="la abue").enviar_mensaje_a_familia(p)
     assert p.resultado == {"enviado": True}
-    assert aviso.enviados == ["Mensaje de la abue para Majo: Gracias mija, aquí la espero"]
+    assert aviso.enviados == ['la abue le manda decir a Majo: "Gracias mija, aquí la espero"']
 
 
 async def test_si_falla_el_envio_la_asistente_lo_dice(repo, persona):
@@ -84,7 +84,7 @@ async def test_crisis_avisa_al_grupo_de_inmediato(repo, persona):
     p = ParametrosFalsos({"nivel": "crisis", "motivo": "Dijo que ya no quiere vivir"})
     await Sesion(repo, persona.id, aviso=aviso, trato="la abue").generar_alerta(p)
     assert len(aviso.enviados) == 1
-    assert aviso.enviados[0].startswith("URGENTE sobre la abue")
+    assert aviso.enviados[0].startswith("URGENTE: en la llamada, la abue dijo algo que me preocupa")
     assert LINEA_DE_LA_VIDA in aviso.enviados[0]
 
 
@@ -108,11 +108,11 @@ async def test_resumen_de_la_llamada(repo, persona):
     )
 
     texto = sesion.resumen(7)
-    assert texto.startswith("Llamada con la abue: 7 min.")
-    assert "boda: Se casó en 1968" in texto
+    assert texto.startswith("Hola, familia. Acabo de platicar unos 7 minutos con la abue.")
+    assert "Les quiso compartir esto: Se casó en 1968." in texto
     assert "No compartir" not in texto
-    assert "1 de 1" in texto
-    assert "Sin alertas." in texto
+    assert "Jugamos un juego de memoria y le atinó a 1." in texto
+    assert texto.endswith("Todo tranquilo por hoy.")
 
 
 def test_instrucciones_ofrecen_la_nota_de_voz(persona):

@@ -237,7 +237,11 @@ const guardarParaLaPersona = async (msg, info) => {
   log(`Guardado ${info.tipo === "voz" ? "nota de voz" : "mensaje"} de ${info.de}`);
   await cliente.socket.sendMessage(
     msg.key.remoteJid,
-    { text: `Listo, ${info.de}. Se lo paso a ${datos.trato} en la próxima llamada.` },
+    {
+      text: info.tipo === "voz"
+        ? `Gracias, ${info.de.split(" ")[0]}. En la próxima llamada le pongo su audio a ${datos.trato}.`
+        : `Gracias, ${info.de.split(" ")[0]}. Se lo digo a ${datos.trato} en la próxima llamada.`,
+    },
     { quoted: msg },
   );
 };
