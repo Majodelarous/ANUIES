@@ -153,7 +153,10 @@ const llamar = async (digitos, reintentos = 0) => {
   // Para decidir si se reintenta: cuándo contestó y cuánto audio de la persona llegó
   const seguimiento = { contestoEn: 0, bloquesPersona: 0 };
   llamada.on("connected", () => { seguimiento.contestoEn = Date.now(); });
-  llamada.on("audio", () => { seguimiento.bloquesPersona += 1; });
+  // Solo cuenta el audio después de contestar: mientras suena también llega audio (el tono)
+  llamada.on("audio", () => {
+    if (seguimiento.contestoEn) seguimiento.bloquesPersona += 1;
+  });
 
   // waitForEnd se resuelve aunque la llamada haya terminado antes de llegar aquí
   llamada.waitForEnd().then((motivo) => {
