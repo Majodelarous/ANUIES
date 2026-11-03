@@ -8,7 +8,7 @@ from compania.dominio.modelos import MensajeFamiliar
 def test_esquemas_tienen_manejador_y_nombres_unicos(repo, persona):
     esquemas = Sesion(repo, persona.id).esquemas()
     nombres = [e.name for e in esquemas]
-    assert len(nombres) == len(set(nombres)) == 11
+    assert len(nombres) == len(set(nombres)) == 14
     assert all(e.handler is not None for e in esquemas)
 
 

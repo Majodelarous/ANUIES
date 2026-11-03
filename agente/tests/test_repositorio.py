@@ -29,3 +29,25 @@ def test_llamadas(repo, persona):
 def test_alertas(repo, persona):
     repo.guardar_alerta(Alerta(persona.id, NivelAlerta.CRISIS, "Dijo que ya no quiere vivir"))
     assert repo.alertas(persona.id)[0].nivel == NivelAlerta.CRISIS
+
+
+def test_horarios_y_ejecuciones(repo, persona):
+    from compania.dominio.modelos import Horario
+
+    horario = repo.guardar_horario(Horario(persona.id, "17:30"))
+    assert [h.hora for h in repo.horarios(persona.id)] == ["17:30"]
+    assert repo.desactivar_horario(horario.id, persona.id)
+    assert repo.horarios() == []
+
+    repo.marcar_ejecutada("2026-11-05 17:30 llamada 1")
+    repo.marcar_ejecutada("2026-11-05 17:30 llamada 1")  # no se duplica
+    assert repo.ejecutadas_desde("2026-11-05") == {"2026-11-05 17:30 llamada 1"}
+    assert repo.ejecutadas_desde("2026-11-06") == set()
+
+
+def test_persona_con_telefono(repo):
+    from compania.dominio.modelos import Persona
+
+    persona = repo.guardar_persona(Persona("Amada", "abuelita", telefono="522221234567"))
+    assert repo.obtener_persona(persona.id).telefono == "522221234567"
+    assert [p.nombre for p in repo.personas()] == ["Amada"]

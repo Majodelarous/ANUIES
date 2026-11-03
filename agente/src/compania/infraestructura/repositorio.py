@@ -8,6 +8,7 @@ from pathlib import Path
 
 from compania.dominio.modelos import (
     Alerta,
+    Horario,
     Llamada,
     MensajeFamiliar,
     NivelAlerta,
@@ -15,6 +16,7 @@ from compania.dominio.modelos import (
     Recordatorio,
     Recuerdo,
     RespuestaBienestar,
+    Seguimiento,
 )
 
 ESQUEMA = """
@@ -70,6 +72,25 @@ CREATE TABLE IF NOT EXISTS llamadas (
     inicio TEXT NOT NULL,
     fin TEXT
 );
+CREATE TABLE IF NOT EXISTS seguimientos (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    para TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    creado TEXT NOT NULL,
+    cerrado TEXT,
+    resultado TEXT
+);
+CREATE TABLE IF NOT EXISTS horarios (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    hora TEXT NOT NULL,
+    activo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS ejecuciones (
+    clave TEXT PRIMARY KEY,
+    creado TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS resultados_juego (
     id INTEGER PRIMARY KEY,
     persona_id INTEGER NOT NULL REFERENCES personas(id),
@@ -91,7 +112,16 @@ class Repositorio:
         self._db = sqlite3.connect(str(ruta), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(ESQUEMA)
+        self._migrar()
         self._db.commit()
+
+    def _migrar(self) -> None:
+        """Agrega columnas nuevas a bases creadas con versiones anteriores."""
+        columnas = {f["name"] for f in self._db.execute("PRAGMA table_info(personas)")}
+        if "telefono" not in columnas:
+            self._db.execute("ALTER TABLE personas ADD COLUMN telefono TEXT")
+        if "consentimiento" not in columnas:
+            self._db.execute("ALTER TABLE personas ADD COLUMN consentimiento TEXT")
 
     def cerrar(self) -> None:
         self._db.close()
@@ -105,8 +135,15 @@ class Repositorio:
 
     def guardar_persona(self, persona: Persona) -> Persona:
         persona.id = self._insertar(
-            "INSERT INTO personas (nombre, trato, contacto_emergencia) VALUES (?, ?, ?)",
-            (persona.nombre, persona.trato, persona.contacto_emergencia),
+            "INSERT INTO personas (nombre, trato, contacto_emergencia, telefono, consentimiento)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                persona.nombre,
+                persona.trato,
+                persona.contacto_emergencia,
+                persona.telefono,
+                persona.consentimiento.isoformat() if persona.consentimiento else None,
+            ),
         )
         return persona
 
@@ -114,7 +151,23 @@ class Repositorio:
         fila = self._db.execute("SELECT * FROM personas WHERE id = ?", (persona_id,)).fetchone()
         if not fila:
             return None
-        return Persona(fila["nombre"], fila["trato"], fila["contacto_emergencia"], fila["id"])
+        return Persona(
+            fila["nombre"],
+            fila["trato"],
+            fila["contacto_emergencia"],
+            fila["id"],
+            fila["telefono"],
+            _fecha(fila["consentimiento"]),
+        )
+
+    def personas(self) -> list[Persona]:
+        filas = self._db.execute("SELECT id FROM personas ORDER BY id").fetchall()
+        return [p for f in filas if (p := self.obtener_persona(f["id"])) is not None]
+
+    def registrar_consentimiento(self, persona_id: int, acepta: bool) -> None:
+        valor = datetime.now().isoformat() if acepta else None
+        self._db.execute("UPDATE personas SET consentimiento = ? WHERE id = ?", (valor, persona_id))
+        self._db.commit()
 
     def primera_persona(self) -> Persona | None:
         fila = self._db.execute("SELECT id FROM personas ORDER BY id LIMIT 1").fetchone()
@@ -328,3 +381,88 @@ class Repositorio:
             "INSERT INTO resultados_juego (persona_id, juego_id, acerto, creado) VALUES (?, ?, ?, ?)",
             (persona_id, juego_id, int(acerto), datetime.now().isoformat()),
         )
+
+    # Seguimientos (pendientes de preguntar en otra llamada)
+
+    def guardar_seguimiento(self, seguimiento: Seguimiento) -> Seguimiento:
+        seguimiento.id = self._insertar(
+            "INSERT INTO seguimientos (persona_id, para, motivo, creado) VALUES (?, ?, ?, ?)",
+            (seguimiento.persona_id, seguimiento.para, seguimiento.motivo, seguimiento.creado.isoformat()),
+        )
+        return seguimiento
+
+    def seguimientos_abiertos(self, persona_id: int) -> list[Seguimiento]:
+        filas = self._db.execute(
+            "SELECT * FROM seguimientos WHERE persona_id = ? AND cerrado IS NULL ORDER BY creado",
+            (persona_id,),
+        ).fetchall()
+        return [
+            Seguimiento(
+                f["persona_id"],
+                f["para"],
+                f["motivo"],
+                datetime.fromisoformat(f["creado"]),
+                None,
+                None,
+                f["id"],
+            )
+            for f in filas
+        ]
+
+    def cerrar_seguimiento(self, seguimiento_id: int, persona_id: int, resultado: str) -> bool:
+        cur = self._db.execute(
+            "UPDATE seguimientos SET cerrado = ?, resultado = ? WHERE id = ? AND persona_id = ? AND cerrado IS NULL",
+            (datetime.now().isoformat(), resultado, seguimiento_id, persona_id),
+        )
+        self._db.commit()
+        return cur.rowcount == 1
+
+    # Horarios de llamada
+
+    def guardar_horario(self, horario: Horario) -> Horario:
+        horario.id = self._insertar(
+            "INSERT INTO horarios (persona_id, hora, activo) VALUES (?, ?, ?)",
+            (horario.persona_id, horario.hora, int(horario.activo)),
+        )
+        return horario
+
+    def horarios(self, persona_id: int | None = None) -> list[Horario]:
+        sql = "SELECT * FROM horarios WHERE activo = 1"
+        valores: tuple = ()
+        if persona_id is not None:
+            sql += " AND persona_id = ?"
+            valores = (persona_id,)
+        filas = self._db.execute(sql + " ORDER BY hora", valores).fetchall()
+        return [Horario(f["persona_id"], f["hora"], bool(f["activo"]), f["id"]) for f in filas]
+
+    def desactivar_horario(self, horario_id: int, persona_id: int) -> bool:
+        cur = self._db.execute(
+            "UPDATE horarios SET activo = 0 WHERE id = ? AND persona_id = ?", (horario_id, persona_id)
+        )
+        self._db.commit()
+        return cur.rowcount == 1
+
+    def todos_los_recordatorios_activos(self) -> list[Recordatorio]:
+        filas = self._db.execute("SELECT persona_id FROM recordatorios WHERE activo = 1 GROUP BY persona_id")
+        return [r for f in filas.fetchall() for r in self.recordatorios_activos(f["persona_id"])]
+
+    def obtener_recordatorio(self, recordatorio_id: int) -> Recordatorio | None:
+        f = self._db.execute("SELECT * FROM recordatorios WHERE id = ?", (recordatorio_id,)).fetchone()
+        if not f:
+            return None
+        return Recordatorio(
+            f["persona_id"], f["texto"], f["hora"], f["creado_por"], bool(f["activo"]), f["id"]
+        )
+
+    # Ejecuciones del programador (para no lanzar dos veces la misma tarea)
+
+    def marcar_ejecutada(self, clave: str) -> None:
+        self._db.execute(
+            "INSERT OR IGNORE INTO ejecuciones (clave, creado) VALUES (?, ?)",
+            (clave, datetime.now().isoformat()),
+        )
+        self._db.commit()
+
+    def ejecutadas_desde(self, dia: str) -> set[str]:
+        filas = self._db.execute("SELECT clave FROM ejecuciones WHERE clave >= ?", (dia,)).fetchall()
+        return {f["clave"] for f in filas}

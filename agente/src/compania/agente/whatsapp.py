@@ -141,7 +141,8 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
             ),
         )
         try:
-            await run_bot(transporte, canal="whatsapp", frecuencia_audio=FRECUENCIA)
+            motivo = websocket.query_params.get("motivo", "")[:60]
+            await run_bot(transporte, canal="whatsapp", frecuencia_audio=FRECUENCIA, motivo=motivo)
         except Exception:
             logger.exception("La llamada terminó con error")
 

@@ -149,6 +149,17 @@ def verificar_motor() -> str:
     return motor
 
 
+def recordatorio_del_motivo(repo: Repositorio, motivo: str, persona_id: int) -> str:
+    """Texto del recordatorio si la llamada es de tipo "recordatorio:<id>"; si no, cadena vacía."""
+    if not motivo.startswith("recordatorio:"):
+        return ""
+    try:
+        recordatorio = repo.obtener_recordatorio(int(motivo.split(":", 1)[1]))
+    except ValueError:
+        return ""
+    return recordatorio.texto if recordatorio and recordatorio.persona_id == persona_id else ""
+
+
 def _canal(runner_args: RunnerArguments) -> str:
     return "web" if isinstance(runner_args, SmallWebRTCRunnerArguments) else "telefono"
 
@@ -159,8 +170,14 @@ async def run_bot(
     *,
     canal: str | None = None,
     frecuencia_audio: int | None = None,
+    motivo: str = "",
 ) -> None:
-    """Corre una llamada. ``canal``: web, telefono o app; si falta se deduce de ``runner_args``."""
+    """Corre una llamada.
+
+    ``canal``: web, telefono, app o whatsapp; si falta se deduce de ``runner_args``.
+    ``motivo``: vacío o "programada" para una llamada normal; "recordatorio:<id>" para una llamada
+    corta que solo entrega ese recordatorio.
+    """
     repo = Repositorio(os.getenv("RUTA_DB", "compania.db"))
     persona_id = os.getenv("PERSONA_ID")
     persona = repo.obtener_persona(int(persona_id)) if persona_id else repo.primera_persona()
@@ -170,6 +187,7 @@ async def run_bot(
     canal = canal or (_canal(runner_args) if runner_args else "telefono")
     llamada = repo.iniciar_llamada(persona.id, canal)
     respuestas = repo.respuestas(persona.id)
+    recordatorio = recordatorio_del_motivo(repo, motivo, persona.id)
     instrucciones = construir_instrucciones(
         persona,
         primera_llamada=repo.es_primera_llamada(persona.id),
@@ -177,8 +195,10 @@ async def run_bot(
         recordatorios=repo.recordatorios_activos(persona.id),
         mensajes=repo.mensajes_pendientes(persona.id),
         preguntas_bienestar=bienestar.elegir_preguntas_del_dia(respuestas),
+        seguimientos=repo.seguimientos_abiertos(persona.id),
+        recordatorio_de_la_llamada=recordatorio,
     )
-    sesion = Sesion(repo, persona.id, aviso=aviso_desde_entorno(), trato=persona.trato)
+    sesion = Sesion(repo, persona.id, aviso=aviso_desde_entorno(), trato=persona.trato, motivo=recordatorio)
     llm = crear_servicio_voz(instrucciones, sesion.esquemas())
     logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal}")
 

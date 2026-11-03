@@ -23,6 +23,7 @@ from compania.dominio.modelos import (
     Recordatorio,
     Recuerdo,
     RespuestaBienestar,
+    Seguimiento,
 )
 from compania.infraestructura.puente_whatsapp import AvisoFamilia, SinAviso
 from compania.infraestructura.repositorio import Repositorio
@@ -79,9 +80,14 @@ class Sesion:
         aviso: AvisoFamilia | None = None,
         trato: str = "la persona",
         agenda: Agenda | None = None,
+        motivo: str = "",
     ) -> None:
         self.repo = repo
         self.persona_id = persona_id
+        persona = repo.obtener_persona(persona_id)
+        self.consentimiento = bool(persona and persona.consentimiento)
+        # Texto del recordatorio si la llamada es solo para recordar algo
+        self.motivo = motivo
         self.agenda = agenda or Agenda.desde(repo.mensajes_pendientes(persona_id))
         self.aviso = aviso or SinAviso()
         self.trato = trato
@@ -93,8 +99,37 @@ class Sesion:
         self.mensajes_entregados: list[str] = []
         self.recordatorios_creados: list[str] = []
         self.alertas: list[str] = []
+        self.pedidos_de_llamada: list[str] = []
+        self.seguimientos_cerrados: list[str] = []
+
+    async def _sin_permiso(self, params: ParametrosLlamada) -> bool:
+        if self.consentimiento:
+            return False
+        await params.result_callback(
+            {
+                "error": "sin permiso",
+                "que_hacer": "Primero explícale qué guardas y qué compartes con su familia, pídele su "
+                "permiso y usa registrar_consentimiento.",
+            }
+        )
+        return True
+
+    async def registrar_consentimiento(self, params: ParametrosLlamada) -> None:
+        acepta = bool(params.arguments.get("acepta"))
+        self.repo.registrar_consentimiento(self.persona_id, acepta)
+        self.consentimiento = acepta
+        await params.result_callback(
+            {"registrado": True}
+            if acepta
+            else {
+                "registrado": True,
+                "que_hacer": "Respeta su decisión: platica sin guardar recuerdos ni hacer preguntas de bienestar.",
+            }
+        )
 
     async def guardar_recuerdo(self, params: ParametrosLlamada) -> None:
+        if await self._sin_permiso(params):
+            return
         args = params.arguments
         recuerdo = self.repo.guardar_recuerdo(
             Recuerdo(
@@ -149,6 +184,8 @@ class Sesion:
         await params.result_callback({"registrado": True})
 
     async def registrar_respuesta_bienestar(self, params: ParametrosLlamada) -> None:
+        if await self._sin_permiso(params):
+            return
         pregunta_id = str(params.arguments["pregunta_id"])
         if pregunta_id not in bienestar.PREGUNTAS:
             await params.result_callback({"error": "pregunta desconocida"})
@@ -250,6 +287,38 @@ class Sesion:
             else {"enviado": False, "que_decir": "Dile que se lo pasarás después."}
         )
 
+    async def pedir_que_le_llamen(self, params: ParametrosLlamada) -> None:
+        """Puente con la familia: avisa al grupo que la persona quiere platicar con alguien."""
+        para = str(params.arguments["para"]).strip()
+        motivo = str(params.arguments.get("motivo") or "").strip()
+        texto = f"Hola, {para}. {_frase(f'{self.trato} tiene ganas de platicar contigo')}"
+        if motivo:
+            texto += f" {_frase(motivo)}"
+        texto += " ¿Le puedes marcar hoy cuando tengas un momento?"
+        enviado = await self.aviso.enviar(texto)
+        seguimiento = self.repo.guardar_seguimiento(Seguimiento(self.persona_id, para, motivo or "platicar"))
+        self.pedidos_de_llamada.append(para)
+        await params.result_callback(
+            {
+                "enviado": enviado,
+                "seguimiento_id": seguimiento.id,
+                "que_decir": (
+                    f"Dile que ya le avisaste a {para} y que en la próxima llamada le preguntarás cómo le fue."
+                    if enviado
+                    else f"Dile que le avisarás a {para} en cuanto puedas."
+                ),
+            }
+        )
+
+    async def cerrar_seguimiento(self, params: ParametrosLlamada) -> None:
+        seguimiento_id = int(params.arguments["seguimiento_id"])
+        resultado = str(params.arguments.get("resultado") or "").strip()
+        abiertos = {s.id: s for s in self.repo.seguimientos_abiertos(self.persona_id)}
+        ok = self.repo.cerrar_seguimiento(seguimiento_id, self.persona_id, resultado)
+        if ok and seguimiento_id in abiertos and resultado:
+            self.seguimientos_cerrados.append(f"{abiertos[seguimiento_id].para}: {resultado}")
+        await params.result_callback({"cerrado": ok})
+
     async def generar_alerta(self, params: ParametrosLlamada) -> None:
         nivel = NivelAlerta(str(params.arguments["nivel"]))
         alerta = self.repo.guardar_alerta(Alerta(self.persona_id, nivel, str(params.arguments["motivo"])))
@@ -275,6 +344,8 @@ class Sesion:
             or self.mensajes_entregados
             or self.recordatorios_creados
             or self.alertas
+            or self.pedidos_de_llamada
+            or self.seguimientos_cerrados
         )
 
     def resumen(self, minutos: int) -> str:
@@ -282,7 +353,12 @@ class Sesion:
         t = self.trato
         tiempo = "un ratito" if minutos <= 2 else f"unos {minutos} minutos"
         nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
-        partes = [f"Hola, familia, soy {nombre}. Acabo de platicar {tiempo} con {t}."]
+        if self.motivo:
+            partes = [
+                f"Hola, familia, soy {nombre}. Le llamé a {t} para recordarle: {self.motivo.rstrip('.')}."
+            ]
+        else:
+            partes = [f"Hola, familia, soy {nombre}. Acabo de platicar {tiempo} con {t}."]
         if self.recuerdos_compartidos:
             partes.append(
                 "Les quiso compartir esto: " + " ".join(_frase(r) for r in self.recuerdos_compartidos)
@@ -295,6 +371,11 @@ class Sesion:
                 f"Jugamos {_cuantos(self.juegos_jugados, 'juego', 'juegos')} de memoria y "
                 f"le atinó a {self.aciertos}."
             )
+        if self.pedidos_de_llamada:
+            partes.append(f"Tiene ganas de platicar con {_lista(self.pedidos_de_llamada)}; ya se lo avisé.")
+        for cerrado in self.seguimientos_cerrados:
+            quien, resultado = cerrado.split(": ", 1)
+            partes.append(f"Le pregunté cómo le fue con {quien}: {_frase(resultado)}")
         if self.recordatorios_creados:
             partes.append("Me pidió que le recuerde: " + _lista(self.recordatorios_creados) + ".")
         if self.agenda.pendientes():
@@ -427,6 +508,45 @@ class Sesion:
                 },
                 required=["texto"],
                 handler=self.enviar_mensaje_a_familia,
+            ),
+            FunctionSchema(
+                name="registrar_consentimiento",
+                description=(
+                    "Registra si la persona acepta que recuerdes lo que te cuenta y que su familia reciba un "
+                    "resumen de cada llamada. Pregúntaselo en palabras sencillas antes de usarla."
+                ),
+                properties={"acepta": {"type": "boolean"}},
+                required=["acepta"],
+                handler=self.registrar_consentimiento,
+            ),
+            FunctionSchema(
+                name="pedir_que_le_llamen",
+                description=(
+                    "Avisa a alguien de la familia por el grupo de WhatsApp que la persona tiene ganas de "
+                    "platicar con él o ella, para que le marque. Úsala solo si la persona aceptó."
+                ),
+                properties={
+                    "para": {
+                        "type": "string",
+                        "description": "Primer nombre del familiar, por ejemplo 'Elena'",
+                    },
+                    "motivo": {
+                        "type": "string",
+                        "description": "Opcional, en una frase: de qué quiere platicar, contado en tercera persona",
+                    },
+                },
+                required=["para"],
+                handler=self.pedir_que_le_llamen,
+            ),
+            FunctionSchema(
+                name="cerrar_seguimiento",
+                description="Cierra un pendiente de una llamada anterior después de preguntar cómo le fue.",
+                properties={
+                    "seguimiento_id": {"type": "integer"},
+                    "resultado": {"type": "string", "description": "Qué te contó, en una frase"},
+                },
+                required=["seguimiento_id", "resultado"],
+                handler=self.cerrar_seguimiento,
             ),
             FunctionSchema(
                 name="generar_alerta",

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from compania.dominio.alertas import LINEA_DE_LA_VIDA
 from compania.dominio.bienestar import Pregunta
-from compania.dominio.modelos import MensajeFamiliar, Persona, Recordatorio, Recuerdo
+from compania.dominio.modelos import MensajeFamiliar, Persona, Recordatorio, Recuerdo, Seguimiento
 
 BASE = """Te llamas {nombre}. Eres una asistente de compañía por voz para personas adultas mayores en México.
 Tu voz se escucha por teléfono o por bocina: no uses listas, emojis ni formato.
@@ -30,6 +30,9 @@ Reglas que nunca rompes:
   usa la herramienta generar_alerta con nivel "crisis" y comparte la Línea de la Vida,
   {linea}, que atiende las 24 horas.
 - No eres sustituto de su familia: anima el contacto con personas y actividades.
+- Cuando hable con cariño o nostalgia de alguien de su familia, o diga que le gustaría hablar
+  con alguien, ofrécele avisarle: "¿Quiere que le diga a Elena que le marque?". Si acepta, usa
+  pedir_que_le_llamen. Ofrécelo como máximo una vez por llamada.
 
 Estructura de cada llamada:
 1. Saludo usando su trato. Si hay un recuerdo reciente, retómalo con naturalidad.
@@ -72,6 +75,8 @@ def construir_instrucciones(
     recordatorios: Sequence[Recordatorio] = (),
     mensajes: Sequence[MensajeFamiliar] = (),
     preguntas_bienestar: Sequence[Pregunta] = (),
+    seguimientos: Sequence[Seguimiento] = (),
+    recordatorio_de_la_llamada: str = "",
 ) -> str:
     nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
     partes = [BASE.format(linea=LINEA_DE_LA_VIDA, nombre=nombre)]
@@ -82,6 +87,27 @@ def construir_instrucciones(
             f"Es la primera llamada: preséntate como {nombre}, explica que eres una asistente que va "
             "a acompañarle y pregúntale cómo le gusta que le digan."
         )
+
+    if recordatorio_de_la_llamada:
+        partes.append(
+            f'\nEsta es una llamada corta para recordarle: "{recordatorio_de_la_llamada}". Salúdale, '
+            "díselo con calma, pregúntale si ya lo hizo o si necesita algo y despídete con cariño. "
+            "No propongas juegos ni hagas preguntas de bienestar en esta llamada."
+        )
+
+    if not persona.consentimiento:
+        partes.append(
+            "\nTodavía no te ha dado permiso. Al inicio, después de saludar, explícale en palabras "
+            "sencillas que puedes acordarte de lo que te cuente para platicarlo otro día y que su "
+            "familia recibirá un resumen corto de cada llamada. Pregúntale si está de acuerdo y usa "
+            "registrar_consentimiento. Si no acepta, platica sin guardar recuerdos ni hacer "
+            "preguntas de bienestar."
+        )
+
+    if seguimientos:
+        partes.append("\nPendientes de llamadas anteriores (pregunta con naturalidad cómo le fue):")
+        partes += [f"- id {s.id}: pidió que {s.para} le marcara ({s.motivo})" for s in seguimientos]
+        partes.append("Después de que te cuente, usa cerrar_seguimiento con lo que te dijo.")
 
     if recuerdos:
         partes.append("\nRecuerdos que ya te contó (del más reciente al más antiguo):")
@@ -100,7 +126,7 @@ def construir_instrucciones(
         partes.append("\nRecordatorios activos:")
         partes += [f"- {r.hora}: {r.texto}" for r in recordatorios]
 
-    if preguntas_bienestar:
+    if preguntas_bienestar and not recordatorio_de_la_llamada and persona.consentimiento:
         partes.append("\nPreguntas de bienestar para hoy (adáptalas a la plática):")
         partes += [f"- id {p.id}: {p.texto}" for p in preguntas_bienestar]
 

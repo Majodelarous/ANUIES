@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -17,11 +19,26 @@ def main() -> None:
     parser.add_argument("--nombre", required=True)
     parser.add_argument("--trato", required=True, help='Cómo le gusta que le digan, p. ej. "doña Carmen"')
     parser.add_argument("--contacto", help="Teléfono o nombre del contacto de emergencia")
+    parser.add_argument("--telefono", help="WhatsApp o teléfono con código de país, p. ej. 522221234567")
+    parser.add_argument(
+        "--consentimiento",
+        action="store_true",
+        help="La persona ya firmó el consentimiento por escrito; Rous no lo pedirá en la primera llamada",
+    )
     parser.add_argument("--demo", action="store_true", help="Agregar un recordatorio y un mensaje de ejemplo")
     args = parser.parse_args()
 
     repo = Repositorio(os.getenv("RUTA_DB", "compania.db"))
-    persona = repo.guardar_persona(Persona(args.nombre, args.trato, args.contacto))
+    telefono = re.sub(r"\D", "", args.telefono) if args.telefono else None
+    persona = repo.guardar_persona(
+        Persona(
+            args.nombre,
+            args.trato,
+            args.contacto,
+            telefono=telefono,
+            consentimiento=datetime.now() if args.consentimiento else None,
+        )
+    )
     assert persona.id is not None
     if args.demo:
         repo.guardar_recordatorio(

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -16,7 +17,9 @@ def repo(tmp_path):
 
 @pytest.fixture
 def persona(repo) -> Persona:
-    return repo.guardar_persona(Persona("Carmen", "doña Carmen", "555 000 0000"))
+    return repo.guardar_persona(
+        Persona("Carmen", "doña Carmen", "555 000 0000", consentimiento=datetime.now())
+    )
 
 
 class LLMFalso:
