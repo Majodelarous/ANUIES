@@ -38,7 +38,12 @@ TEXTO_SEMAFORO = {
     ),
 }
 
-NOMBRE_CANAL = {"telefono": "Teléfono", "app": "Llamada por app", "web": "Navegador"}
+NOMBRE_CANAL = {
+    "telefono": "Teléfono",
+    "app": "Llamada por app",
+    "whatsapp": "WhatsApp",
+    "web": "Navegador",
+}
 
 NOMBRE_NIVEL = {
     NivelAlerta.INFORMATIVA: "Informativa",

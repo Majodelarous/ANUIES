@@ -1,0 +1,19 @@
+{
+  "name": "compania-whatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Puente entre WhatsApp (llamadas de voz) y el agente de Compañía por voz",
+  "scripts": {
+    "postinstall": "patch-package",
+    "start": "node puente.mjs",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "baileys-caller": "github:SheIITear/baileys-caller#36c6e0a03d7d80723b4f203a45d4cb9e1a4b86f6",
+    "patch-package": "^8.0.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -7,7 +7,7 @@ No diagnostica ni sustituye atención profesional.
 ## Cómo funciona
 
 ```
-Teléfono (Twilio) o navegador (WebRTC)
+WhatsApp, teléfono (Twilio), app (Asterisk) o navegador (WebRTC)
         |
    Agente de voz (Pipecat)
         |-- Modelo de voz a voz: Gemini Live o Amazon Nova Sonic
@@ -58,6 +58,8 @@ uv run compania-llamar --a +52XXXXXXXXXX --host <dominio-ngrok>
 Con cuenta de prueba de Twilio solo se puede llamar a números verificados en la consola, y la llamada inicia con un aviso de cuenta de prueba.
 
 Para llamar por app sin operador telefónico (Asterisk + Linphone), ver `telefonia/README.md`.
+
+Para que la asistente llame por WhatsApp (suena con el celular bloqueado), ver `whatsapp/README.md`.
 
 ## Principios
 

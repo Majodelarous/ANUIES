@@ -1,0 +1,144 @@
+diff --git a/node_modules/baileys-caller/dist/audio-feeder.mjs b/node_modules/baileys-caller/dist/audio-feeder.mjs
+index db66747..e3c22b7 100644
+--- a/node_modules/baileys-caller/dist/audio-feeder.mjs
++++ b/node_modules/baileys-caller/dist/audio-feeder.mjs
+@@ -22,6 +22,9 @@ export class AudioFeeder {
+     #emitTimer = null;
+     #nextEmitAtMs = 0;
+     #warmupUntilMs = 0;
++    // compania-voz: fuente "push" (audio en vivo empujado con push())
++    #push = false;
++    #pushPending = new Float32Array(0);
+     droppedChunks = 0;
+     underflowChunks = 0;
+     bytesProduced = 0;
+@@ -34,11 +37,18 @@ export class AudioFeeder {
+         this.source = source;
+     }
+     start = () => {
+-        if (this.#proc)
++        if (this.#proc || this.#push)
+             return;
+         const chunkSamples = this.framesPerChunk * this.channels;
+         const chunkBytes = chunkSamples * Float32Array.BYTES_PER_ELEMENT;
+         const chunkIntervalMs = (this.framesPerChunk / this.sampleRate) * 1000;
++        if (this.source === "push") {
++            this.#push = true;
++            this.#nextEmitAtMs = 0;
++            this.#warmupUntilMs = 0;
++            this.#scheduleNext(chunkSamples, chunkIntervalMs);
++            return;
++        }
+         const inputArgs = this.#resolveInputArgs();
+         this.#proc = spawn("ffmpeg", [
+             "-hide_banner",
+@@ -78,7 +88,34 @@ export class AudioFeeder {
+         this.#warmupUntilMs = Date.now() + DEFAULT_WARMUP_MS;
+         this.#scheduleNext(chunkSamples, chunkIntervalMs);
+     };
++    /** compania-voz: agrega muestras Float32 (mono, a sampleRate) a la cola de salida. */
++    push = (samples) => {
++        if (!this.#push)
++            return;
++        const chunkSamples = this.framesPerChunk * this.channels;
++        const merged = new Float32Array(this.#pushPending.length + samples.length);
++        merged.set(this.#pushPending, 0);
++        merged.set(samples, this.#pushPending.length);
++        let offset = 0;
++        while (merged.length - offset >= chunkSamples) {
++            if (this.#queue.length >= MAX_QUEUED_CHUNKS) {
++                this.droppedChunks += 1;
++            }
++            else {
++                this.#queue.push(merged.slice(offset, offset + chunkSamples));
++            }
++            offset += chunkSamples;
++        }
++        this.#pushPending = merged.slice(offset);
++    };
++    /** compania-voz: descarta el audio pendiente (la persona interrumpió). */
++    clear = () => {
++        this.#queue = [];
++        this.#pushPending = new Float32Array(0);
++    };
+     stop = () => {
++        this.#push = false;
++        this.#pushPending = new Float32Array(0);
+         if (this.#emitTimer) {
+             clearTimeout(this.#emitTimer);
+             this.#emitTimer = null;
+@@ -99,7 +136,7 @@ export class AudioFeeder {
+         return ["-i", this.source];
+     };
+     #scheduleNext = (chunkSamples, chunkIntervalMs) => {
+-        if (!this.#proc)
++        if (!this.#proc && !this.#push)
+             return;
+         const now = Date.now();
+         if (this.#nextEmitAtMs === 0)
+diff --git a/node_modules/baileys-caller/dist/index.mjs b/node_modules/baileys-caller/dist/index.mjs
+index 33d3bd9..e43d662 100644
+--- a/node_modules/baileys-caller/dist/index.mjs
++++ b/node_modules/baileys-caller/dist/index.mjs
+@@ -74,6 +74,21 @@ export class ActiveCall extends EventEmitter {
+     #ended = false;
+     /** @internal mirrors the source path for the audio feeder */
+     _audioSource = "silence";
++    /** @internal compania-voz: alimentador activo y audio recibido antes de que exista */
++    _feeder = null;
++    _pendingAudio = [];
++    /** compania-voz: envía audio en vivo (Float32, 16 kHz mono) si audioSource es "push". */
++    pushAudio = (samples) => {
++        if (this._feeder)
++            this._feeder.push(samples);
++        else if (this._pendingAudio.length < 500)
++            this._pendingAudio.push(samples);
++    };
++    /** compania-voz: descarta el audio que aún no se reproduce. */
++    clearAudio = () => {
++        this._pendingAudio = [];
++        this._feeder?.clear();
++    };
+     constructor(callId, engine, durationMs) {
+         super();
+         this.callId = callId;
+@@ -149,6 +164,10 @@ export class VoipClient {
+     constructor(config) {
+         this.#config = config;
+     }
++    /** compania-voz: socket de Baileys para enviar mensajes con la misma sesión. */
++    get socket() { return this.#sock; }
++    /** compania-voz: llamada en curso, si hay. */
++    get activeCall() { return this.#activeCall; }
+     /** Connect to WhatsApp and bring up the WASM VoIP stack. */
+     connect = async () => {
+         this.#baileys = await loadBaileys();
+@@ -288,6 +307,11 @@ export class VoipClient {
+         const call = new ActiveCall(callId, this.#engine, durationMs);
+         call._audioSource = audioSource;
+         this.#activeCall = call;
++        // compania-voz: liberar la llamada al terminar para poder hacer la siguiente
++        call.once("ended", () => {
++            if (this.#activeCall === call)
++                this.#activeCall = null;
++        });
+         this.#engine.startCall({
+             peerJid: peerLid,
+             peerPn: targetPnJid,
+@@ -353,8 +377,16 @@ export class VoipClient {
+                 this.#engine.sendAudioData(chunk, this.#capturePtr);
+         }, audioSource);
+         this.#feeder.start();
++        if (this.#activeCall) {
++            this.#activeCall._feeder = this.#feeder;
++            for (const samples of this.#activeCall._pendingAudio)
++                this.#feeder.push(samples);
++            this.#activeCall._pendingAudio = [];
++        }
+     };
+     #handleAudioCaptureStop = () => {
++        if (this.#activeCall)
++            this.#activeCall._feeder = null;
+         this.#feeder?.stop();
+         this.#feeder = null;
+         if (this.#engine && this.#capturePtr) {
