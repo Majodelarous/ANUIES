@@ -12,7 +12,7 @@
 - [ ] T08 Comparar Gemini Live y Nova Sonic con la misma conversación (naturalidad, comprensión, latencia)
 - [ ] T09 Llamada telefónica real con Twilio (bloqueada: la cuenta de prueba no permite `<Stream>`)
 - [x] T09b Llamada por app: Asterisk + Linphone (funciona con la app abierta; iOS no suena en segundo plano sin notificaciones push)
-- [ ] T09c Llamada por WhatsApp con puente baileys-caller (código listo; falta vincular el número de la asistente y probar)
+- [x] T09c Llamada por WhatsApp con puente baileys-caller: suena con el celular bloqueado y la asistente conversa (probado el 2026-11-02)
 
 ## Iteración 2: familia y voz familiar
 
