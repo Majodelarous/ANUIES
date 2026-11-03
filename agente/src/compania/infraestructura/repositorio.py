@@ -8,6 +8,7 @@ from pathlib import Path
 
 from compania.dominio.modelos import (
     Alerta,
+    Compromiso,
     Horario,
     Llamada,
     MensajeFamiliar,
@@ -86,6 +87,15 @@ CREATE TABLE IF NOT EXISTS horarios (
     persona_id INTEGER NOT NULL REFERENCES personas(id),
     hora TEXT NOT NULL,
     activo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS compromisos (
+    id INTEGER PRIMARY KEY,
+    persona_id INTEGER NOT NULL REFERENCES personas(id),
+    de TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    hora TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    avisado INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS ejecuciones (
     clave TEXT PRIMARY KEY,
@@ -482,3 +492,42 @@ class Repositorio:
     def ejecutadas_desde(self, dia: str) -> set[str]:
         filas = self._db.execute("SELECT clave FROM ejecuciones WHERE clave >= ?", (dia,)).fetchall()
         return {f["clave"] for f in filas}
+
+    # Compromisos de la familia ("a las 5 te marco")
+
+    def guardar_compromiso(self, compromiso: Compromiso) -> Compromiso:
+        compromiso.id = self._insertar(
+            "INSERT INTO compromisos (persona_id, de, fecha, hora, texto, avisado) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                compromiso.persona_id,
+                compromiso.de,
+                compromiso.fecha,
+                compromiso.hora,
+                compromiso.texto,
+                int(compromiso.avisado),
+            ),
+        )
+        return compromiso
+
+    def compromisos_por_avisar(self) -> list[Compromiso]:
+        filas = self._db.execute(
+            "SELECT * FROM compromisos WHERE avisado = 0 ORDER BY fecha, hora"
+        ).fetchall()
+        return [
+            Compromiso(
+                f["persona_id"], f["de"], f["fecha"], f["hora"], f["texto"], bool(f["avisado"]), f["id"]
+            )
+            for f in filas
+        ]
+
+    def marcar_compromiso_avisado(self, compromiso_id: int) -> None:
+        self._db.execute("UPDATE compromisos SET avisado = 1 WHERE id = ?", (compromiso_id,))
+        self._db.commit()
+
+    def obtener_compromiso(self, compromiso_id: int) -> Compromiso | None:
+        f = self._db.execute("SELECT * FROM compromisos WHERE id = ?", (compromiso_id,)).fetchone()
+        if not f:
+            return None
+        return Compromiso(
+            f["persona_id"], f["de"], f["fecha"], f["hora"], f["texto"], bool(f["avisado"]), f["id"]
+        )

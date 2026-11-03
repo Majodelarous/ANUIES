@@ -16,7 +16,7 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from compania.dominio.modelos import Horario, Recordatorio
+from compania.dominio.modelos import Compromiso, Horario, Recordatorio
 
 VENTANA = timedelta(minutes=10)
 CERCANIA = timedelta(minutes=30)
@@ -25,11 +25,12 @@ CERCANIA = timedelta(minutes=30)
 @dataclass(frozen=True, slots=True)
 class Tarea:
     clave: str
-    tipo: str  # "llamada" o "recordatorio"
+    tipo: str  # "llamada", "recordatorio" o "compromiso" (avisarle a un familiar que quedó de llamar)
     persona_id: int
     hora: str
     recordatorio_id: int | None = None
     texto: str = ""
+    compromiso_id: int | None = None
 
     @property
     def motivo(self) -> str:
@@ -46,6 +47,7 @@ def tareas_pendientes(
     horarios: Iterable[Horario],
     recordatorios: Iterable[Recordatorio],
     ejecutadas: Collection[str],
+    compromisos: Iterable[Compromiso] = (),
 ) -> list[Tarea]:
     """Tareas cuya hora ya llegó (dentro de la ventana) y que no se han lanzado hoy."""
     dia = ahora.strftime("%Y-%m-%d")
@@ -68,5 +70,13 @@ def tareas_pendientes(
         clave = f"{dia} {r.hora} recordatorio {r.id}"
         if momento <= ahora < momento + VENTANA and clave not in ejecutadas:
             tareas.append(Tarea(clave, "recordatorio", r.persona_id, r.hora, r.id, r.texto))
+
+    for c in compromisos:
+        if c.avisado or c.id is None or c.fecha != dia:
+            continue
+        momento = a_fecha(c.hora, ahora)
+        clave = f"{dia} {c.hora} compromiso {c.id}"
+        if momento <= ahora < momento + VENTANA and clave not in ejecutadas:
+            tareas.append(Tarea(clave, "compromiso", c.persona_id, c.hora, texto=c.de, compromiso_id=c.id))
 
     return sorted(tareas, key=lambda t: t.hora)

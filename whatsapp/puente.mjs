@@ -249,8 +249,10 @@ const guardarParaLaPersona = async (msg, info) => {
     msg.key.remoteJid,
     {
       text: info.tipo === "voz"
-        ? `Gracias, ${info.de.split(" ")[0]}. En la próxima llamada le pongo su audio a ${datos.trato}.`
-        : `Gracias, ${info.de.split(" ")[0]}. Se lo digo a ${datos.trato} en la próxima llamada.`,
+        ? `Gracias, ${info.de}. En la próxima llamada le pongo su audio a ${datos.trato}.`
+        : datos.compromiso
+          ? `Gracias, ${info.de}. Se lo digo a ${datos.trato} en la próxima llamada, y a las ${datos.compromiso.hora} te recuerdo que le marques.`
+          : `Gracias, ${info.de}. Se lo digo a ${datos.trato} en la próxima llamada.`,
     },
     { quoted: msg },
   );

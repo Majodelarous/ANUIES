@@ -113,3 +113,16 @@ class Horario:
     hora: str
     activo: bool = True
     id: int | None = None
+
+
+@dataclass(slots=True)
+class Compromiso:
+    """Alguien de la familia quedó de llamarle a una hora (por ejemplo, "a las 5 te marco")."""
+
+    persona_id: int
+    de: str
+    fecha: str  # AAAA-MM-DD
+    hora: str  # HH:MM
+    texto: str
+    avisado: bool = False
+    id: int | None = None

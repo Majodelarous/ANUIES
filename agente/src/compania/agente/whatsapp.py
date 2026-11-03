@@ -82,7 +82,8 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
 
     from compania.agente.bot import run_bot
     from compania.agente.herramientas import cargar_audio
-    from compania.dominio.modelos import MensajeFamiliar
+    from compania.dominio.compromisos import extraer_compromiso
+    from compania.dominio.modelos import Compromiso, MensajeFamiliar, Seguimiento
     from compania.infraestructura.repositorio import Repositorio
 
     app = FastAPI(title="Compañía por voz: WhatsApp")
@@ -125,7 +126,16 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None) -> FastAPI:
         logger.info(
             f"Mensaje {guardado.id} de {guardado.de} para {persona.trato} ({'voz' if ruta else 'texto'})"
         )
-        return {"id": guardado.id, "trato": persona.trato}
+        respuesta = {"id": guardado.id, "trato": persona.trato}
+        # "Abue, salgo a las 5 y te marco": recordarle al familiar a esa hora y preguntar después
+        compromiso = extraer_compromiso(mensaje.texto, datetime.now()) if mensaje.texto else None
+        if compromiso:
+            fecha, hora = compromiso
+            de = mensaje.de.strip()
+            repositorio.guardar_compromiso(Compromiso(persona.id, de, fecha, hora, mensaje.texto.strip()))
+            repositorio.guardar_seguimiento(Seguimiento(persona.id, de, f"quedó de marcarle a las {hora}"))
+            respuesta["compromiso"] = {"fecha": fecha, "hora": hora}
+        return respuesta
 
     @app.websocket("/wa")
     async def llamada(websocket: WebSocket) -> None:

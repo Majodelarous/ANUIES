@@ -132,7 +132,12 @@ def construir_instrucciones(
 
     if seguimientos:
         partes.append("\nPendientes de llamadas anteriores (pregunta con naturalidad cómo le fue):")
-        partes += [f"- id {s.id}: pidió que {s.para} le marcara ({s.motivo})" for s in seguimientos]
+        partes += [
+            f"- id {s.id}: {s.para} {s.motivo}; si ya pasó esa hora, pregúntale si le marcó"
+            if s.motivo.startswith("quedó de")
+            else f"- id {s.id}: pidió que {s.para} le marcara ({s.motivo})"
+            for s in seguimientos
+        ]
         partes.append("Después de que te cuente, usa cerrar_seguimiento con lo que te dijo.")
 
     if recuerdos:

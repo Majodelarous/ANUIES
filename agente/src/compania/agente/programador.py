@@ -80,6 +80,7 @@ class Programador:
             self.repo.horarios(),
             self.repo.todos_los_recordatorios_activos(),
             self.repo.ejecutadas_desde(ahora.strftime("%Y-%m-%d")),
+            self.repo.compromisos_por_avisar(),
         )
         for tarea in tareas:
             self.repo.marcar_ejecutada(tarea.clave)
@@ -95,6 +96,8 @@ class Programador:
     async def atender(self, tarea: Tarea) -> str:
         """Llama, espera el resultado y reintenta o avisa. Devuelve: contesto, sin_respuesta, omitida o error."""
         persona = self.repo.obtener_persona(tarea.persona_id)
+        if tarea.tipo == "compromiso":
+            return await self.recordar_compromiso(tarea, persona.trato if persona else "su familiar")
         numero = numero_de(persona) if persona else None
         if persona is None or numero is None:
             logger.warning(f"{tarea.clave}: la persona no tiene número; se omite")
@@ -120,6 +123,15 @@ class Programador:
         await self.aviso.enviar(texto_sin_respuesta(tarea, persona.trato, nombre))
         logger.warning(f"{tarea.clave}: no contestó en dos intentos; se avisó a la familia")
         return "sin_respuesta"
+
+    async def recordar_compromiso(self, tarea: Tarea, trato: str) -> str:
+        """A la hora prometida, le recuerda al familiar por el grupo que quedó de llamar."""
+        if tarea.compromiso_id is not None:
+            self.repo.marcar_compromiso_avisado(tarea.compromiso_id)
+        enviado = await self.aviso.enviar(
+            f"{tarea.texto}, son las {tarea.hora}: quedaste de marcarle a {trato}. Le va a dar mucho gusto escucharte."
+        )
+        return "avisado" if enviado else "error"
 
     async def _llamar_y_esperar(self, numero: str, tarea: Tarea) -> bool | None:
         """True si contestó, False si no contestó, None si no se pudo lanzar la llamada."""
