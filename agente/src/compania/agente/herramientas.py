@@ -233,9 +233,17 @@ class Sesion:
         )
 
     async def enviar_mensaje_a_familia(self, params: ParametrosLlamada) -> None:
-        texto = str(params.arguments["texto"]).strip()
+        texto = str(params.arguments["texto"]).strip().strip('"')
         para = str(params.arguments.get("para") or "la familia").strip()
-        enviado = await self.aviso.enviar(_frase(f'{self.trato} le manda decir a {para}: "{texto}"'))
+        recado = str(params.arguments.get("recado") or "").strip().rstrip(".")
+        if recado:
+            # El recado contado en tercera persona y, después, sus palabras tal cual
+            mensaje = (
+                f'{_frase(f"{self.trato} le manda decir a {para} {recado}")} Sus palabras fueron: "{texto}".'
+            )
+        else:
+            mensaje = _frase(f'{self.trato} le manda decir a {para}: "{texto}"')
+        enviado = await self.aviso.enviar(mensaje)
         await params.result_callback(
             {"enviado": enviado}
             if enviado
@@ -404,8 +412,18 @@ class Sesion:
                     "Confirma el texto con ella antes de enviarlo."
                 ),
                 properties={
-                    "texto": {"type": "string", "description": "El mensaje con las palabras de la persona"},
-                    "para": {"type": "string", "description": "A quién va dirigido, por ejemplo 'Majo'"},
+                    "texto": {
+                        "type": "string",
+                        "description": "Las palabras exactas de la persona, por ejemplo 'Yo también te quiero mucho'",
+                    },
+                    "recado": {
+                        "type": "string",
+                        "description": (
+                            "El mismo mensaje contado en tercera persona, empezando con 'que', por ejemplo "
+                            "'que ella también lo quiere mucho'"
+                        ),
+                    },
+                    "para": {"type": "string", "description": "Solo el primer nombre, por ejemplo 'Majo'"},
                 },
                 required=["texto"],
                 handler=self.enviar_mensaje_a_familia,

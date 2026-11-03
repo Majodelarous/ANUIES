@@ -171,3 +171,15 @@ async def test_puente_apagado_no_rompe_la_llamada():
     from compania.infraestructura.puente_whatsapp import PuenteWhatsApp
 
     assert await PuenteWhatsApp(puerto=9, timeout=1).enviar("hola") is False
+
+
+async def test_recado_en_tercera_persona_y_palabras_originales(repo, persona):
+    aviso = AvisoFalso()
+    p = ParametrosFalsos(
+        {"texto": "Yo también te quiero mucho", "recado": "que ella también lo quiere mucho", "para": "Forti"}
+    )
+    await Sesion(repo, persona.id, aviso=aviso, trato="abuelita").enviar_mensaje_a_familia(p)
+    assert aviso.enviados == [
+        "Abuelita le manda decir a Forti que ella también lo quiere mucho. "
+        'Sus palabras fueron: "Yo también te quiero mucho".'
+    ]
