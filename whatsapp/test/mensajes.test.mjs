@@ -17,6 +17,8 @@ const msg = (contenido, extra = {}) => ({
 test("toda nota de voz del grupo es para la persona", () => {
   const info = clasificarMensaje(msg({ audioMessage: { seconds: 7 } }), GRUPO);
   assert.deepEqual(info, { tipo: "voz", de: "Majo", segundos: 7 });
+  const largo = clasificarMensaje({ ...msg({ audioMessage: {} }), pushName: "Fortino Romero" }, GRUPO);
+  assert.equal(largo.de, "Fortino");
 });
 
 test("texto con el prefijo cuenta, aunque lleve acento o mayúsculas", () => {

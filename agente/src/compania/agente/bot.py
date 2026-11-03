@@ -73,6 +73,23 @@ def crear_servicio_voz(instrucciones: str, herramientas: list):
     """Crea el servicio de voz a voz según ``MOTOR_VOZ`` (gemini o nova)."""
     motor = os.getenv("MOTOR_VOZ", "gemini").lower()
 
+    if motor == "openai":
+        from pipecat.services.openai.realtime import events
+        from pipecat.services.openai.realtime.llm import OpenAIRealtimeLLMService
+
+        ajustes_openai = OpenAIRealtimeLLMService.Settings(
+            model=os.getenv("OPENAI_MODEL") or "gpt-realtime-2.1",
+            system_instruction=instrucciones,
+            session_properties=events.SessionProperties(
+                audio=events.AudioConfiguration(
+                    output=events.AudioOutput(voice=os.getenv("OPENAI_VOICE") or "marin")
+                )
+            ),
+        )
+        return OpenAIRealtimeLLMService(
+            api_key=os.environ["OPENAI_API_KEY"], settings=ajustes_openai, tools=herramientas
+        )
+
     if motor == "nova":
         from pipecat.services.aws.nova_sonic.llm import AWSNovaSonicLLMService
 
@@ -112,13 +129,18 @@ def verificar_motor() -> str:
             from pipecat.services.aws.nova_sonic.llm import AWSNovaSonicLLMService  # noqa: F401
 
             credenciales_aws()
+        elif motor == "openai":
+            from pipecat.services.openai.realtime.llm import OpenAIRealtimeLLMService  # noqa: F401
+
+            if not os.getenv("OPENAI_API_KEY"):
+                raise RuntimeError("Falta OPENAI_API_KEY en .env")
         elif motor == "gemini":
             from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService  # noqa: F401
 
             if not os.getenv("GOOGLE_API_KEY"):
                 raise RuntimeError("Falta GOOGLE_API_KEY en .env")
         else:
-            raise RuntimeError(f"MOTOR_VOZ={motor!r} no existe; usa gemini o nova")
+            raise RuntimeError(f"MOTOR_VOZ={motor!r} no existe; usa gemini, nova u openai")
     except ImportError as error:
         raise SystemExit(f"Falta instalar el motor {motor}: ejecuta uv sync ({error})") from None
     except Exception as error:
@@ -164,7 +186,10 @@ async def run_bot(
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            # OpenAI detecta los turnos en su servidor; sumar la detección local los duplicaría
+            vad_analyzer=None
+            if os.getenv("MOTOR_VOZ", "gemini").lower() == "openai"
+            else SileroVADAnalyzer(),
             # Silencia el micrófono mientras corre una herramienta, por ejemplo una nota de voz
             user_mute_strategies=[FunctionCallUserMuteStrategy()],
         ),

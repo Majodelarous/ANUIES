@@ -66,3 +66,23 @@ def test_nova_instalado(monkeypatch):
     monkeypatch.setenv("MOTOR_VOZ", "nova")
     monkeypatch.setattr(bot, "credenciales_aws", lambda: {})
     assert bot.verificar_motor() == "nova"
+
+
+def test_openai_sin_llave_falla_al_arrancar(monkeypatch):
+    from compania.agente.bot import verificar_motor
+
+    monkeypatch.setenv("MOTOR_VOZ", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(SystemExit, match="OPENAI_API_KEY"):
+        verificar_motor()
+
+
+def test_servicio_openai_usa_la_voz_elegida(monkeypatch):
+    from compania.agente.bot import crear_servicio_voz
+
+    monkeypatch.setenv("MOTOR_VOZ", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-prueba")
+    monkeypatch.setenv("OPENAI_VOICE", "cedar")
+    servicio = crear_servicio_voz("Eres Rous.", [])
+    assert type(servicio).__name__ == "OpenAIRealtimeLLMService"
+    assert servicio._settings.session_properties.audio.output.voice == "cedar"

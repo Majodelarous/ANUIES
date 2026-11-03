@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 
 from compania.dominio.alertas import LINEA_DE_LA_VIDA
 from compania.dominio.bienestar import Pregunta
 from compania.dominio.modelos import MensajeFamiliar, Persona, Recordatorio, Recuerdo
 
-BASE = """Eres una asistente de compañía por voz para personas adultas mayores en México.
+BASE = """Te llamas {nombre}. Eres una asistente de compañía por voz para personas adultas mayores en México.
 Tu voz se escucha por teléfono o por bocina: no uses listas, emojis ni formato.
 
 Forma de hablar:
@@ -21,7 +22,8 @@ Forma de hablar:
 - Di cada idea una sola vez; no repitas frases completas.
 
 Reglas que nunca rompes:
-- Eres una asistente, no una persona. Si te preguntan, dilo con naturalidad.
+- Eres una asistente, no una persona. Si te preguntan, dilo con naturalidad: "Soy {nombre},
+  una asistente que le llama para platicar y para llevarle los mensajes de su familia".
 - No diagnosticas, no recetas y no opinas sobre medicamentos. Si hay un tema de salud,
   sugiere comentarlo con su médico o con su familia.
 - Si la persona expresa ideas de hacerse daño o de no querer vivir, escucha con calma,
@@ -70,13 +72,14 @@ def construir_instrucciones(
     mensajes: Sequence[MensajeFamiliar] = (),
     preguntas_bienestar: Sequence[Pregunta] = (),
 ) -> str:
-    partes = [BASE.format(linea=LINEA_DE_LA_VIDA)]
+    nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
+    partes = [BASE.format(linea=LINEA_DE_LA_VIDA, nombre=nombre)]
 
     partes.append(f'\nPersona: {persona.nombre}. Dile "{persona.trato}".')
     if primera_llamada:
         partes.append(
-            "Es la primera llamada: preséntate, explica que eres una asistente que va a "
-            "acompañarle y pregúntale cómo le gusta que le digan."
+            f"Es la primera llamada: preséntate como {nombre}, explica que eres una asistente que va "
+            "a acompañarle y pregúntale cómo le gusta que le digan."
         )
 
     if recuerdos:

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Agente conversacional de voz para personas adultas mayores"
 requires-python = ">=3.12"
 dependencies = [
-    "pipecat-ai[aws-nova-sonic,google,runner,silero,webrtc,websocket]>=1.15,<2",
+    "pipecat-ai[aws-nova-sonic,google,openai,runner,silero,webrtc,websocket]>=1.15,<2",
     "boto3>=1.35",
     "pipecat-asterisk>=0.1.4,<0.2",
     "python-dotenv>=1.0",

@@ -70,7 +70,7 @@ async def test_respuesta_de_la_persona_va_al_grupo(repo, persona):
     p = ParametrosFalsos({"texto": "Gracias mija, aquí la espero", "para": "Majo"})
     await Sesion(repo, persona.id, aviso=aviso, trato="la abue").enviar_mensaje_a_familia(p)
     assert p.resultado == {"enviado": True}
-    assert aviso.enviados == ['la abue le manda decir a Majo: "Gracias mija, aquí la espero"']
+    assert aviso.enviados == ['La abue le manda decir a Majo: "Gracias mija, aquí la espero".']
 
 
 async def test_si_falla_el_envio_la_asistente_lo_dice(repo, persona):
@@ -108,7 +108,7 @@ async def test_resumen_de_la_llamada(repo, persona):
     )
 
     texto = sesion.resumen(7)
-    assert texto.startswith("Hola, familia. Acabo de platicar unos 7 minutos con la abue.")
+    assert texto.startswith("Hola, familia, soy Rous. Acabo de platicar unos 7 minutos con la abue.")
     assert "Les quiso compartir esto: Se casó en 1968." in texto
     assert "No compartir" not in texto
     assert "Jugamos un juego de memoria y le atinó a 1." in texto

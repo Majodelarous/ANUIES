@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import wave
 from pathlib import Path
@@ -234,7 +235,7 @@ class Sesion:
     async def enviar_mensaje_a_familia(self, params: ParametrosLlamada) -> None:
         texto = str(params.arguments["texto"]).strip()
         para = str(params.arguments.get("para") or "la familia").strip()
-        enviado = await self.aviso.enviar(f'{self.trato} le manda decir a {para}: "{texto}"')
+        enviado = await self.aviso.enviar(_frase(f'{self.trato} le manda decir a {para}: "{texto}"'))
         await params.result_callback(
             {"enviado": enviado}
             if enviado
@@ -272,9 +273,12 @@ class Sesion:
         """Mensaje cálido para el grupo de la familia al terminar la llamada, en un párrafo."""
         t = self.trato
         tiempo = "un ratito" if minutos <= 2 else f"unos {minutos} minutos"
-        partes = [f"Hola, familia. Acabo de platicar {tiempo} con {t}."]
+        nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
+        partes = [f"Hola, familia, soy {nombre}. Acabo de platicar {tiempo} con {t}."]
         if self.recuerdos_compartidos:
-            partes.append("Les quiso compartir esto: " + " ".join(_frase(r) for r in self.recuerdos_compartidos))
+            partes.append(
+                "Les quiso compartir esto: " + " ".join(_frase(r) for r in self.recuerdos_compartidos)
+            )
         if self.mensajes_entregados:
             quienes = _lista(list(dict.fromkeys(self.mensajes_entregados)))
             partes.append(f"Le entregué los mensajes de {quienes}.")
@@ -287,7 +291,9 @@ class Sesion:
             partes.append("Me pidió que le recuerde: " + _lista(self.recordatorios_creados) + ".")
         if self.agenda.pendientes():
             quienes = _lista([m.de for m in self.agenda.pendientes()])
-            partes.append(f"Me quedó pendiente pasarle lo que le mandó {quienes}; se lo doy en la próxima llamada.")
+            partes.append(
+                f"Me quedó pendiente pasarle lo que le mandó {quienes}; se lo doy en la próxima llamada."
+            )
         if self.alertas:
             partes.append("Les pido que estén pendientes: " + " ".join(_frase(a) for a in self.alertas))
         else:
