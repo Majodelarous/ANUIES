@@ -21,6 +21,10 @@
 - [ ] T12 Mensaje con audio de voz familiar consentida y reproducción dentro de la llamada (HU-05.3)
 - [ ] T13 Ajuste de ritmo, silencios y vocabulario con pruebas con la persona real
 
+## Revisión pendiente
+
+- [ ] Fortino revisa la rama `mejoras-prioritarias` (T18 versión 1, T21, T22, T23) y decide si se une a `main` o se descarta. La versión estable anterior queda en la etiqueta `v0.1-estable`.
+
 ## Iteración 3: notificaciones y despliegue
 
 - [x] T14 Grupo de WhatsApp de la familia: resumen al terminar cada llamada, alertas de atención y crisis al momento, notas de voz y textos ("Abue, ...") que se entregan en la llamada, respuesta de la persona al grupo (probado el 2026-11-02: notas de voz, respuestas y resumen llegan al grupo)
