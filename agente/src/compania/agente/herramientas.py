@@ -16,6 +16,7 @@ from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import OutputAudioRawFrame
 
 from compania.agente.grabadora import Grabadora, tono
+from compania.agente.imagenes import dibujar
 from compania.dominio import bienestar
 from compania.dominio.agenda import Agenda
 from compania.dominio.alertas import LINEA_DE_LA_VIDA, instruccion_para_nivel
@@ -96,6 +97,7 @@ class Sesion:
         self.motivo = motivo
         self.grabadora = grabadora
         self.notas_enviadas: list[str] = []
+        self.imagen_enviada = False
         self.agenda = agenda or Agenda.desde(repo.mensajes_pendientes(persona_id))
         self.aviso = aviso or SinAviso()
         self.trato = trato
@@ -385,6 +387,24 @@ class Sesion:
             else {"enviado": False, "que_decir": "Dile que se lo harás llegar después."}
         )
 
+    async def mandar_imagen_buenos_dias(self, params: ParametrosLlamada) -> None:
+        """Manda al grupo una imagen de saludo (original, generada aquí) de parte de la persona."""
+        if self.imagen_enviada:
+            await params.result_callback(
+                {"enviado": False, "que_decir": "Dile que ya mandaron una imagen hoy."}
+            )
+            return
+        mensaje = str(params.arguments.get("mensaje") or "Que tengan un bonito día").strip()[:120]
+        firma = str(params.arguments.get("firma") or self.trato).strip()[:60]
+        imagen = await asyncio.to_thread(dibujar, mensaje, firma)
+        enviado = await self.aviso.enviar_imagen(imagen, _frase(f"De parte de {firma}, con cariño"))
+        self.imagen_enviada = enviado
+        await params.result_callback(
+            {"enviado": enviado}
+            if enviado
+            else {"enviado": False, "que_decir": "Dile que se la mandarás en cuanto puedas."}
+        )
+
     async def generar_alerta(self, params: ParametrosLlamada) -> None:
         nivel = NivelAlerta(str(params.arguments["nivel"]))
         alerta = self.repo.guardar_alerta(Alerta(self.persona_id, nivel, str(params.arguments["motivo"])))
@@ -412,6 +432,7 @@ class Sesion:
             or self.alertas
             or self.pedidos_de_llamada
             or self.notas_enviadas
+            or self.imagen_enviada
             or self.seguimientos_cerrados
         )
 
@@ -438,6 +459,8 @@ class Sesion:
                 f"Jugamos {_cuantos(self.juegos_jugados, 'juego', 'juegos')} de memoria y "
                 f"le atinó a {self.aciertos}."
             )
+        if self.imagen_enviada:
+            partes.append("Les mandó una imagen de saludo.")
         if self.notas_enviadas:
             partes.append(f"Les mandó una nota de voz a {_lista(list(dict.fromkeys(self.notas_enviadas)))}.")
         if self.pedidos_de_llamada:
@@ -641,6 +664,22 @@ class Sesion:
                 properties={"para": {"type": "string", "description": "Primer nombre del familiar"}},
                 required=["para"],
                 handler=self.grabar_mensaje_de_voz,
+            ),
+            FunctionSchema(
+                name="mandar_imagen_buenos_dias",
+                description=(
+                    "Manda al grupo de la familia una imagen de saludo (buenos días, buenas tardes) de parte "
+                    "de la persona, con la frase que ella elija. Úsala solo si aceptó; una vez por llamada."
+                ),
+                properties={
+                    "mensaje": {"type": "string", "description": "Frase corta que ella quiere poner"},
+                    "firma": {
+                        "type": "string",
+                        "description": "Cómo quiere firmar, por ejemplo 'su abuelita Amada' o 'la abue'",
+                    },
+                },
+                required=["mensaje"],
+                handler=self.mandar_imagen_buenos_dias,
             ),
             FunctionSchema(
                 name="generar_alerta",

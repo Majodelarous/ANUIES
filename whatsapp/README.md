@@ -95,6 +95,10 @@ Con `WHATSAPP_GRUPO` en `agente/.env` (nombre exacto del grupo, y el número de 
 - Los textos que empiezan con "abue" (`WHATSAPP_PREFIJO`) también se guardan, por ejemplo "Abue, el sábado voy". La plática normal del grupo no se le pasa.
 - Si la persona quiere responder, la asistente confirma el texto y lo manda al grupo.
 
+- Si un mensaje de la familia promete una llamada con hora ("Abue, salgo a las 5 y te marco"), el puente lo confirma en el grupo, a esa hora el programador le recuerda a esa persona que quedó de marcarle, y en la siguiente llamada Rous le pregunta a la abue si le marcó.
+- La abue puede responder con su propia voz: suena un tonito, habla y al quedarse callada la grabación llega al grupo como nota de voz.
+- Rous puede ofrecerle mandar al grupo una imagen de saludo (buenos días, buenas tardes) con su frase y su firma. La imagen se dibuja aquí mismo: es original, sin personajes ni imágenes de internet.
+
 El puente lee `../agente/.env`, así que la configuración está en un solo lugar. Si creas el grupo con el puente encendido, reinícialo para que lo encuentre.
 
 ## Variables

@@ -36,5 +36,5 @@
 - [x] T21 Llamadas programadas a la hora que pone la familia en el panel, con un reintento y aviso al grupo si no contesta (probado en llamada real el 2026-11-03)
 - [x] T22 Recordatorios a su hora con una llamada corta (probado en llamada real el 2026-11-03)
 - [x] T23 Consentimiento de palabra en la primera llamada; sin permiso no se guardan recuerdos ni respuestas de bienestar (probado en llamada real el 2026-11-03)
-- [ ] T16 Imágenes de buenos días: ayudar a la persona a conseguir y mandar sus imágenes al grupo (pendiente)
+- [~] T16 (hecho en la rama ideas; falta probar en llamada real) Imágenes de buenos días: Rous ofrece mandar al grupo una imagen de saludo original de parte de la persona
 - [ ] T15 Despliegue en la nube con infraestructura como código
