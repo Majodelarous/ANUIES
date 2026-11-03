@@ -50,6 +50,10 @@ cat > "$dir/linphone.xml" <<XML
     <entry name="domain" overwrite="true">$ip</entry>
     <entry name="algorithm" overwrite="true">MD5</entry>
   </section>
+  <section name="sip">
+    <entry name="media_encryption" overwrite="true">none</entry>
+    <entry name="media_encryption_mandatory" overwrite="true">0</entry>
+  </section>
   <section name="misc">
     <entry name="transient_provisioning" overwrite="true">1</entry>
   </section>
