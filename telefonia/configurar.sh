@@ -17,10 +17,16 @@ password = $clave
 
 [$cuenta](aor-app)
 CONF
-ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' || true)"
+ip="${ip:-$(hostname -I 2>/dev/null | awk '{print $1}' || true)}"
 echo "Cuenta creada para Linphone:"
 echo "  Usuario:     $cuenta"
 echo "  Contraseña:  $clave"
 echo "  Dominio:     ${ip:-<IP de esta laptop>}"
 echo "  Transporte:  UDP"
 echo "Si Asterisk ya está corriendo: docker exec compania-asterisk asterisk -rx 'module reload res_pjsip.so'"
+echo
+read -r -p "¿Mostrar código QR para Linphone? [S/n] " respuesta
+if [[ ! "$respuesta" =~ ^[nN]$ ]]; then
+  ./qr.sh "$cuenta"
+fi
