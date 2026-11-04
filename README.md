@@ -61,6 +61,19 @@ Para llamar por app sin operador telefónico (Asterisk + Linphone), ver `telefon
 
 Para que la asistente llame por WhatsApp (suena con el celular bloqueado), ver `whatsapp/README.md`.
 
+## Todo en una terminal (make)
+
+Con Node.js 20 o superior además de uv, desde la raíz del repositorio:
+
+```bash
+make instalar        # uv sync y npm install
+make dev             # bot, puente de WhatsApp, programador y panel juntos
+```
+
+`make dev` usa [honcho](https://pypi.org/project/honcho/) (con `uvx`, sin instalar nada) y el archivo `Procfile`. Cada línea sale con el nombre del servicio y la sesión completa se guarda en `logs/dev-AAAAMMDD-HHMMSS.log`, para revisar después una llamada que falló. Ctrl+C detiene los cuatro; si uno se cae, honcho detiene los demás.
+
+Otros comandos: `make llamar` (o `make llamar NUMERO=52...`), `make colgar`, `make test`, `make log` (sigue el log más reciente desde otra terminal) y `make` para ver la ayuda. Cada servicio también se puede levantar solo: `make bot`, `make puente`, `make programador`, `make panel`.
+
 ## Principios
 
 Ver `docs/constitucion.md`. En resumen: la asistente siempre dice que es una asistente, no diagnostica, promueve el contacto con personas, pide consentimiento por escrito para datos de salud y nunca usa voces de personas fallecidas.

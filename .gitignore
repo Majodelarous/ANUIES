@@ -8,3 +8,4 @@ __pycache__/
 *.mp3
 !agente/assets/**/*.wav
 agente/audios/
+logs/
