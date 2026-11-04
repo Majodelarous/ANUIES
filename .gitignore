@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 *.db
 .venv/
 __pycache__/
@@ -9,3 +11,6 @@ __pycache__/
 !agente/assets/**/*.wav
 agente/audios/
 logs/
+respaldos/
+agente/datos/
+whatsapp/auth-*/

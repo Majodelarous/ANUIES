@@ -63,6 +63,8 @@ Para que la asistente llame por WhatsApp (suena con el celular bloqueado), ver `
 
 ## Todo en una terminal (make)
 
+Para instalar desde cero, pasar a datos reales, vincular otro número de WhatsApp o cambiar de motor de IA, ver [OPERACION.md](OPERACION.md).
+
 Con Node.js 20 o superior además de uv, desde la raíz del repositorio:
 
 ```bash

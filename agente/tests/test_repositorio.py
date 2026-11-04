@@ -51,3 +51,9 @@ def test_persona_con_telefono(repo):
     persona = repo.guardar_persona(Persona("Amada", "abuelita", telefono="522221234567"))
     assert repo.obtener_persona(persona.id).telefono == "522221234567"
     assert [p.nombre for p in repo.personas()] == ["Amada"]
+
+
+def test_actualizar_telefono(repo, persona):
+    assert repo.actualizar_telefono(persona.id, "522221234567")
+    assert repo.obtener_persona(persona.id).telefono == "522221234567"
+    assert not repo.actualizar_telefono(999, "522221234567")

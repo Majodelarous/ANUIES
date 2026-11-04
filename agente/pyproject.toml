@@ -21,6 +21,7 @@ compania-llamar-app = "compania.agente.asterisk:llamar"
 compania-whatsapp = "compania.agente.whatsapp:main"
 compania-llamar-wa = "compania.agente.whatsapp:llamar"
 compania-programador = "compania.agente.programador:main"
+compania-datos = "compania.agente.datos:main"
 
 [dependency-groups]
 dev = [

@@ -189,6 +189,11 @@ class Repositorio:
         self._db.execute("UPDATE personas SET consentimiento = ? WHERE id = ?", (valor, persona_id))
         self._db.commit()
 
+    def actualizar_telefono(self, persona_id: int, telefono: str) -> bool:
+        cur = self._db.execute("UPDATE personas SET telefono = ? WHERE id = ?", (telefono, persona_id))
+        self._db.commit()
+        return cur.rowcount == 1
+
     def primera_persona(self) -> Persona | None:
         fila = self._db.execute("SELECT id FROM personas ORDER BY id LIMIT 1").fetchone()
         return self.obtener_persona(fila["id"]) if fila else None
