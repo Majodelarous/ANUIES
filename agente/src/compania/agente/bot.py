@@ -197,6 +197,7 @@ async def run_bot(
         preguntas_bienestar=bienestar.elegir_preguntas_del_dia(respuestas),
         seguimientos=repo.seguimientos_abiertos(persona.id),
         recordatorio_de_la_llamada=recordatorio,
+        ahora=datetime.now(),
     )
     sesion = Sesion(repo, persona.id, aviso=aviso_desde_entorno(), trato=persona.trato, motivo=recordatorio)
     llm = crear_servicio_voz(instrucciones, sesion.esquemas())

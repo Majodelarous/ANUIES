@@ -59,6 +59,8 @@ class Recordatorio:
     creado_por: str = "persona"
     activo: bool = True
     id: int | None = None
+    # "Recuérdame en 5 minutos": suena una vez y se desactiva; los demás se repiten a diario
+    una_vez: bool = False
 
 
 @dataclass(slots=True)

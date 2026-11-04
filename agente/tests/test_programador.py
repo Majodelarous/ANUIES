@@ -121,3 +121,13 @@ def test_aviso_de_recordatorio_sin_respuesta():
         "Hola, familia, soy Rous. Hoy a las 14:00 le marqué dos veces a abuelita para recordarle: "
         "Tomar la pastilla, y no contestó. ¿Alguien puede llamarle o pasar a verle?"
     )
+
+
+async def test_recordatorio_de_una_vez_se_desactiva_al_lanzarlo(repo, abue):
+    una_vez = repo.guardar_recordatorio(Recordatorio(abue.id, "Apagar la luz", "19:36", una_vez=True))
+    diario = repo.guardar_recordatorio(Recordatorio(abue.id, "Tomar la pastilla", "19:36"))
+    prog = programador(repo, PuenteFalso([True, True]), AvisoFalso(), ahora=datetime(2026, 11, 3, 19, 37))
+    assert len(await prog.revisar()) == 2
+    await asyncio.gather(*prog.en_curso)
+    assert [r.id for r in repo.recordatorios_activos(abue.id)] == [diario.id]
+    assert repo.obtener_recordatorio(una_vez.id).una_vez

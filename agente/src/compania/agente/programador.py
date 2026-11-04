@@ -83,6 +83,10 @@ class Programador:
         )
         for tarea in tareas:
             self.repo.marcar_ejecutada(tarea.clave)
+            if tarea.tipo == "recordatorio" and tarea.recordatorio_id is not None:
+                recordatorio = self.repo.obtener_recordatorio(tarea.recordatorio_id)
+                if recordatorio and recordatorio.una_vez:
+                    self.repo.desactivar_recordatorio(recordatorio.id)
             tarea_async = asyncio.create_task(self.atender(tarea))
             self.en_curso.add(tarea_async)
             tarea_async.add_done_callback(self.en_curso.discard)

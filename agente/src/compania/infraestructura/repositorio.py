@@ -122,6 +122,9 @@ class Repositorio:
             self._db.execute("ALTER TABLE personas ADD COLUMN telefono TEXT")
         if "consentimiento" not in columnas:
             self._db.execute("ALTER TABLE personas ADD COLUMN consentimiento TEXT")
+        columnas = {f["name"] for f in self._db.execute("PRAGMA table_info(recordatorios)")}
+        if "una_vez" not in columnas:
+            self._db.execute("ALTER TABLE recordatorios ADD COLUMN una_vez INTEGER NOT NULL DEFAULT 0")
 
     def cerrar(self) -> None:
         self._db.close()
@@ -245,13 +248,15 @@ class Repositorio:
 
     def guardar_recordatorio(self, recordatorio: Recordatorio) -> Recordatorio:
         recordatorio.id = self._insertar(
-            "INSERT INTO recordatorios (persona_id, texto, hora, creado_por, activo) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO recordatorios (persona_id, texto, hora, creado_por, activo, una_vez)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
             (
                 recordatorio.persona_id,
                 recordatorio.texto,
                 recordatorio.hora,
                 recordatorio.creado_por,
                 int(recordatorio.activo),
+                int(recordatorio.una_vez),
             ),
         )
         return recordatorio
@@ -261,10 +266,23 @@ class Repositorio:
             "SELECT * FROM recordatorios WHERE persona_id = ? AND activo = 1 ORDER BY hora",
             (persona_id,),
         ).fetchall()
-        return [
-            Recordatorio(f["persona_id"], f["texto"], f["hora"], f["creado_por"], bool(f["activo"]), f["id"])
-            for f in filas
-        ]
+        return [self._recordatorio(f) for f in filas]
+
+    @staticmethod
+    def _recordatorio(f) -> Recordatorio:
+        return Recordatorio(
+            f["persona_id"],
+            f["texto"],
+            f["hora"],
+            f["creado_por"],
+            bool(f["activo"]),
+            f["id"],
+            bool(f["una_vez"]),
+        )
+
+    def desactivar_recordatorio(self, recordatorio_id: int) -> None:
+        self._db.execute("UPDATE recordatorios SET activo = 0 WHERE id = ?", (recordatorio_id,))
+        self._db.commit()
 
     # Mensajes de la familia
 
@@ -450,9 +468,7 @@ class Repositorio:
         f = self._db.execute("SELECT * FROM recordatorios WHERE id = ?", (recordatorio_id,)).fetchone()
         if not f:
             return None
-        return Recordatorio(
-            f["persona_id"], f["texto"], f["hora"], f["creado_por"], bool(f["activo"]), f["id"]
-        )
+        return self._recordatorio(f)
 
     # Ejecuciones del programador (para no lanzar dos veces la misma tarea)
 

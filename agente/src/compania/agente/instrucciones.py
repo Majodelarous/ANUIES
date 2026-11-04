@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from datetime import datetime
 
 from compania.dominio.alertas import LINEA_DE_LA_VIDA
 from compania.dominio.bienestar import Pregunta
@@ -67,6 +68,28 @@ Herramientas:
 """
 
 
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+]
+
+
+def fecha_hablada(ahora: datetime) -> str:
+    """'martes 3 de noviembre, son las 19:31'."""
+    return f"{DIAS[ahora.weekday()]} {ahora.day} de {MESES[ahora.month - 1]}, son las {ahora:%H:%M}"
+
+
 def construir_instrucciones(
     persona: Persona,
     *,
@@ -77,9 +100,12 @@ def construir_instrucciones(
     preguntas_bienestar: Sequence[Pregunta] = (),
     seguimientos: Sequence[Seguimiento] = (),
     recordatorio_de_la_llamada: str = "",
+    ahora: datetime | None = None,
 ) -> str:
     nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
     partes = [BASE.format(linea=LINEA_DE_LA_VIDA, nombre=nombre)]
+    if ahora is not None:
+        partes.append(f"\nHoy es {fecha_hablada(ahora)}. Usa esta hora para recordatorios y saludos.")
 
     partes.append(f'\nPersona: {persona.nombre}. Dile "{persona.trato}".')
     if primera_llamada:

@@ -70,7 +70,8 @@ cd agente && uv run compania-programador
 ```
 
 - Llama todos los días a las horas que la familia pone en el panel ("Horario de llamada").
-- A la hora de cada recordatorio hace una llamada corta solo para recordarlo, salvo que haya una llamada diaria a menos de 30 minutos (ahí Rous ya lo menciona).
+- A la hora de cada recordatorio hace una llamada corta solo para recordarlo, salvo que venga una llamada diaria en los 30 minutos siguientes (ahí Rous ya lo menciona).
+- "Recuérdame en 5 minutos" o "solo hoy" suena una sola vez y siempre con su propia llamada; los recordatorios a una hora ("a las 2, la pastilla") se repiten todos los días. La hora la calcula el programa con el reloj de la computadora, no el modelo.
 - Si nadie contesta, vuelve a marcar a los 10 minutos. Si tampoco contestan, avisa al grupo y deja una alerta informativa en el panel. Si el puente está apagado no avisa a la familia, porque no fue culpa de la persona.
 - El número de la persona se registra con `compania-semilla --telefono`; si falta, usa `WHATSAPP_PERSONA`.
 

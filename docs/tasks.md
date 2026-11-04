@@ -23,17 +23,18 @@
 
 ## Revisión pendiente
 
-- [ ] Fortino revisa la rama `mejoras-prioritarias` (T18 versión 1, T21, T22, T23) y decide si se une a `main` o se descarta. La versión estable anterior queda en la etiqueta `v0.1-estable`.
+- [x] Fortino revisó la rama `mejoras-prioritarias` (T18 versión 1, T21, T22, T23) en llamadas reales el 2026-11-03 y se unió a `main`. Se corrigió "recuérdame en 5 minutos" (se guardaba en hora UTC). La versión estable anterior queda en la etiqueta `v0.1-estable`.
+- [ ] Fortino revisa la rama `ideas` (T19, T17, T16 y T16b) y decide qué se une a `main`.
 
 ## Iteración 3: notificaciones y despliegue
 
 - [x] T14 Grupo de WhatsApp de la familia: resumen al terminar cada llamada, alertas de atención y crisis al momento, notas de voz y textos ("Abue, ...") que se entregan en la llamada, respuesta de la persona al grupo (probado el 2026-11-02: notas de voz, respuestas y resumen llegan al grupo)
 - [ ] T17 Respuesta de la persona como nota de voz con su propia voz (grabar lo que dicta en la llamada y mandarlo al grupo como audio, en lugar de texto) (pendiente)
-- [~] T18 Puente con la familia (versión 1 hecha en la rama mejoras-prioritarias; falta probar en llamada real): tras platicar de alguien (por ejemplo, su hija Elena), la asistente ofrece comunicarle con esa persona. Versión 1: avisa al grupo que la abue quiere platicar y le pide a esa persona que le marque. Versión 2: revisa la disponibilidad (agenda) y conecta la llamada. En la siguiente llamada pregunta cómo le fue. Responde al hallazgo de que la asistente debe ser puente y no sustituto (pendiente)
+- [~] T18 Puente con la familia (versión 1 probada en llamada real el 2026-11-03; falta versión 2): tras platicar de alguien (por ejemplo, su hija Elena), la asistente ofrece comunicarle con esa persona. Versión 1: avisa al grupo que la abue quiere platicar y le pide a esa persona que le marque. Versión 2: revisa la disponibilidad (agenda) y conecta la llamada. En la siguiente llamada pregunta cómo le fue. Responde al hallazgo de que la asistente debe ser puente y no sustituto (pendiente)
 - [ ] T19 La familia programa llamadas desde el grupo: "Abue, salgo a las 5, a esa hora te marco" queda como pendiente; Rous se lo dice a la persona y a esa hora le recuerda a quien prometió llamar, o le propone conectarlos (se relaciona con T18) (pendiente)
 - [ ] T20 Canal sin internet: llamada al teléfono fijo o celular básico por la red telefónica (proveedor de voz con número local) y número local al que la persona puede marcar; ya existe el código con Twilio, falta cuenta de pago (pendiente)
-- [~] T21 Llamadas programadas a la hora que pone la familia en el panel, con un reintento y aviso al grupo si no contesta (hecho en la rama mejoras-prioritarias; falta probar en llamada real)
-- [~] T22 Recordatorios a su hora con una llamada corta (hecho; falta probar en llamada real)
-- [~] T23 Consentimiento de palabra en la primera llamada; sin permiso no se guardan recuerdos ni respuestas de bienestar (hecho; falta probar en llamada real)
+- [x] T21 Llamadas programadas a la hora que pone la familia en el panel, con un reintento y aviso al grupo si no contesta (probado en llamada real el 2026-11-03)
+- [x] T22 Recordatorios a su hora con una llamada corta (probado en llamada real el 2026-11-03)
+- [x] T23 Consentimiento de palabra en la primera llamada; sin permiso no se guardan recuerdos ni respuestas de bienestar (probado en llamada real el 2026-11-03)
 - [ ] T16 Imágenes de buenos días: ayudar a la persona a conseguir y mandar sus imágenes al grupo (pendiente)
 - [ ] T15 Despliegue en la nube con infraestructura como código

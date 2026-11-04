@@ -4,7 +4,9 @@ Reglas:
 - Una llamada programada se lanza a su hora, con una ventana de tolerancia por si el
   programador estuvo detenido unos minutos.
 - Un recordatorio se lanza como llamada corta a su hora, salvo que haya una llamada diaria
-  cercana: en esa llamada la asistente ya lo menciona.
+  en los 30 minutos siguientes: en esa llamada la asistente ya lo menciona. Una llamada diaria
+  anterior no lo cubre (pudo crearse en esa misma llamada, por ejemplo "en 5 minutos").
+- Un recordatorio de una sola vez siempre tiene su propia llamada y luego se desactiva.
 - Cada tarea se lanza una sola vez al día (su clave incluye la fecha).
 """
 
@@ -61,8 +63,8 @@ def tareas_pendientes(
         if not r.activo or r.id is None:
             continue
         momento = a_fecha(r.hora, ahora)
-        if any(abs(momento - llamada) <= CERCANIA for llamada in horas_llamada):
-            continue  # la llamada diaria ya lo incluye
+        if not r.una_vez and any(timedelta(0) <= llamada - momento <= CERCANIA for llamada in horas_llamada):
+            continue  # la llamada diaria que viene ya lo incluye
         clave = f"{dia} {r.hora} recordatorio {r.id}"
         if momento <= ahora < momento + VENTANA and clave not in ejecutadas:
             tareas.append(Tarea(clave, "recordatorio", r.persona_id, r.hora, r.id, r.texto))

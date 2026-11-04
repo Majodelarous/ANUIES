@@ -62,3 +62,12 @@ def test_llamada_de_recordatorio_es_corta():
 def test_ofrece_avisar_a_la_familia():
     persona = Persona("Carmen", "doña Carmen", id=1, consentimiento=datetime.now())
     assert "pedir_que_le_llamen" in construir_instrucciones(persona, primera_llamada=False)
+
+
+def test_instrucciones_dicen_la_hora_actual(persona):
+    from datetime import datetime
+
+    from compania.agente.instrucciones import construir_instrucciones
+
+    texto = construir_instrucciones(persona, primera_llamada=False, ahora=datetime(2026, 11, 3, 19, 31))
+    assert "Hoy es martes 3 de noviembre, son las 19:31." in texto

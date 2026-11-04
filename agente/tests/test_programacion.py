@@ -43,3 +43,17 @@ def test_la_clave_cambia_cada_dia():
     [hoy] = tareas_pendientes(a(9, 0), [Horario(1, "09:00", id=1)], [], set())
     [manana] = tareas_pendientes(a(9, 0).replace(day=6), [Horario(1, "09:00", id=1)], [], {hoy.clave})
     assert hoy.clave != manana.clave
+
+
+def test_llamada_diaria_anterior_no_tapa_un_recordatorio_posterior():
+    # En la llamada de las 19:05 pidió "recuérdame en 5 minutos": debe sonar a las 19:10
+    horarios = [Horario(1, "19:05", id=1)]
+    tareas = tareas_pendientes(a(19, 10), horarios, [Recordatorio(1, "Apagar la luz", "19:10", id=3)], set())
+    assert [t.recordatorio_id for t in tareas if t.tipo == "recordatorio"] == [3]
+
+
+def test_recordatorio_de_una_vez_siempre_tiene_su_llamada():
+    horarios = [Horario(1, "14:10", id=1)]
+    una_vez = Recordatorio(1, "Sacar la ropa", "14:00", id=4, una_vez=True)
+    [tarea] = tareas_pendientes(a(14, 0), horarios, [una_vez], set())
+    assert tarea.recordatorio_id == 4

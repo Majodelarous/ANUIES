@@ -76,3 +76,33 @@ async def test_alerta_de_crisis_indica_linea_de_la_vida(repo, persona):
     await Sesion(repo, persona.id).generar_alerta(p)
     assert LINEA_DE_LA_VIDA in p.resultado["que_decir"]
     assert len(repo.alertas(persona.id)) == 1
+
+
+async def test_recordatorio_en_minutos_lo_calcula_el_programa(repo, persona):
+    from datetime import datetime
+
+    sesion = Sesion(repo, persona.id, reloj=lambda: datetime(2026, 11, 3, 19, 31))
+    p = ParametrosFalsos({"texto": "apagar la luz", "en_minutos": 5})
+    await sesion.crear_recordatorio(p)
+    assert p.resultado["hora"] == "19:36" and p.resultado["repetir"] == "solo una vez"
+    [r] = repo.recordatorios_activos(persona.id)
+    assert r.hora == "19:36" and r.una_vez
+
+    noche = Sesion(repo, persona.id, reloj=lambda: datetime(2026, 11, 3, 23, 58))
+    q = ParametrosFalsos({"texto": "dormir", "en_minutos": "10"})
+    await noche.crear_recordatorio(q)
+    assert q.resultado["hora"] == "00:08"
+
+    mala = ParametrosFalsos({"texto": "x", "en_minutos": 0})
+    await sesion.crear_recordatorio(mala)
+    assert "error" in mala.resultado
+
+
+async def test_recordatorio_a_una_hora_se_repite_salvo_solo_hoy(repo, persona):
+    sesion = Sesion(repo, persona.id)
+    diario = ParametrosFalsos({"texto": "pastilla", "hora": "14:00"})
+    await sesion.crear_recordatorio(diario)
+    assert diario.resultado["repetir"] == "todos los días"
+    hoy = ParametrosFalsos({"texto": "llamar al doctor", "hora": "16:00", "solo_hoy": True})
+    await sesion.crear_recordatorio(hoy)
+    assert hoy.resultado["repetir"] == "solo una vez"

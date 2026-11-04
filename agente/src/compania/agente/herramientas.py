@@ -6,6 +6,8 @@ import asyncio
 import os
 import re
 import wave
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -81,9 +83,11 @@ class Sesion:
         trato: str = "la persona",
         agenda: Agenda | None = None,
         motivo: str = "",
+        reloj: Callable[[], datetime] = datetime.now,
     ) -> None:
         self.repo = repo
         self.persona_id = persona_id
+        self.reloj = reloj
         persona = repo.obtener_persona(persona_id)
         self.consentimiento = bool(persona and persona.consentimiento)
         # Texto del recordatorio si la llamada es solo para recordar algo
@@ -199,15 +203,38 @@ class Sesion:
         await params.result_callback({"registrado": True})
 
     async def crear_recordatorio(self, params: ParametrosLlamada) -> None:
-        hora = str(params.arguments["hora"]).strip()
-        if not HORA.match(hora):
-            await params.result_callback({"error": "la hora debe tener formato HH:MM de 24 horas"})
-            return
+        texto = str(params.arguments["texto"]).strip()
+        en_minutos = params.arguments.get("en_minutos")
+        if en_minutos not in (None, ""):
+            try:
+                minutos = int(en_minutos)
+            except (TypeError, ValueError):
+                minutos = 0
+            if not 1 <= minutos <= 720:
+                await params.result_callback({"error": "en_minutos debe estar entre 1 y 720"})
+                return
+            hora = (self.reloj() + timedelta(minutes=minutos)).strftime("%H:%M")
+            una_vez = True
+        else:
+            hora = str(params.arguments.get("hora") or "").strip()
+            if not HORA.match(hora):
+                await params.result_callback(
+                    {"error": "usa hora (HH:MM de 24 horas) o en_minutos para 'en 5 minutos'"}
+                )
+                return
+            hora, una_vez = hora.zfill(5), bool(params.arguments.get("solo_hoy"))
         recordatorio = self.repo.guardar_recordatorio(
-            Recordatorio(self.persona_id, str(params.arguments["texto"]), hora.zfill(5))
+            Recordatorio(self.persona_id, texto, hora, una_vez=una_vez)
         )
         self.recordatorios_creados.append(f"{recordatorio.hora} {recordatorio.texto}")
-        await params.result_callback({"creado": True, "id": recordatorio.id})
+        await params.result_callback(
+            {
+                "creado": True,
+                "id": recordatorio.id,
+                "hora": hora,
+                "repetir": "solo una vez" if una_vez else "todos los días",
+            }
+        )
 
     def _entregar(self, mensaje_id: int) -> bool:
         mensaje = self.repo.obtener_mensaje(mensaje_id, self.persona_id)
@@ -451,12 +478,26 @@ class Sesion:
             ),
             FunctionSchema(
                 name="crear_recordatorio",
-                description="Crea un recordatorio que la persona pidió.",
+                description=(
+                    "Crea un recordatorio que la persona pidió. Si dice 'en 5 minutos' o 'en una hora', "
+                    "usa en_minutos y no calcules la hora tú. Confírmale la hora que te devuelve."
+                ),
                 properties={
                     "texto": {"type": "string", "description": "Qué recordar"},
-                    "hora": {"type": "string", "description": "Hora en formato HH:MM de 24 horas"},
+                    "hora": {
+                        "type": "string",
+                        "description": "Hora a la que pidió, formato HH:MM de 24 horas",
+                    },
+                    "en_minutos": {
+                        "type": "integer",
+                        "description": "Para 'en N minutos': cuántos minutos desde ahora (suena una vez)",
+                    },
+                    "solo_hoy": {
+                        "type": "boolean",
+                        "description": "true si es solo para hoy y no todos los días",
+                    },
                 },
-                required=["texto", "hora"],
+                required=["texto"],
                 handler=self.crear_recordatorio,
             ),
             FunctionSchema(
