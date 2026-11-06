@@ -1,0 +1,64 @@
+# Rous en contenedores. Funciona igual en Windows (Docker Desktop), macOS y Linux.
+#
+#   docker compose up -d --build      levanta todo
+#   docker compose logs -f puente     QR para vincular WhatsApp y registro del puente
+#   docker compose down               detiene todo (los datos se quedan en los volúmenes)
+#
+# La configuración sale de agente/.env (copia de agente/.env.example). Aquí solo se fijan las
+# direcciones entre contenedores y dónde se guardan los datos.
+#
+# Otro entorno con datos separados (por ejemplo prod):
+#   ROUS_ENV=agente/.env.prod docker compose -p rous-prod up -d
+name: rous
+
+x-agente: &agente
+  image: rous-agente
+  build: ./agente
+  env_file: ["${ROUS_ENV:-agente/.env}"]
+  environment: &agente-env
+    WHATSAPP_PUENTE_HOST: puente
+    RUTA_DB: /datos/compania.db
+    CARPETA_AUDIOS: /datos/audios
+  volumes:
+    - datos:/datos
+  restart: unless-stopped
+
+services:
+  bot:
+    <<: *agente
+    command: ["compania-whatsapp"]
+    environment:
+      <<: *agente-env
+      WHATSAPP_BOT_ESCUCHA: 0.0.0.0
+
+  puente:
+    image: rous-puente
+    build: ./whatsapp
+    env_file: ["${ROUS_ENV:-agente/.env}"]
+    environment:
+      WHATSAPP_BOT_HOST: bot
+      WHATSAPP_PUENTE_ESCUCHA: 0.0.0.0
+      WA_AUTH_DIR: /auth
+    volumes:
+      - auth:/auth
+    depends_on: [bot]
+    restart: unless-stopped
+
+  programador:
+    <<: *agente
+    command: ["compania-programador"]
+    depends_on: [bot, puente]
+
+  panel:
+    <<: *agente
+    command: ["compania-panel"]
+    environment:
+      <<: *agente-env
+      PANEL_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:7861:7861"
+    depends_on: [bot]
+
+volumes:
+  datos:
+  auth:

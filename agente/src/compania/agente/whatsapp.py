@@ -44,6 +44,8 @@ from pipecat.frames.frames import (
 from pipecat.serializers.base_serializer import FrameSerializer
 from pydantic import BaseModel, Field
 
+from compania.infraestructura.puente_whatsapp import host_del_puente
+
 FRECUENCIA = 16000
 NUMERO = re.compile(r"^\d{10,15}$")
 LIMPIAR = "clear"
@@ -209,17 +211,19 @@ def main() -> None:
 
     load_dotenv(override=True)
     verificar_motor()
-    uvicorn.run(crear_app(), host="127.0.0.1", port=int(os.getenv("WHATSAPP_BOT_PUERTO", "7863")))
+    # En Docker se escucha en 0.0.0.0 (WHATSAPP_BOT_ESCUCHA) para que el puente llegue desde su contenedor
+    host = os.getenv("WHATSAPP_BOT_ESCUCHA") or "127.0.0.1"
+    uvicorn.run(crear_app(), host=host, port=int(os.getenv("WHATSAPP_BOT_PUERTO", "7863")))
 
 
-def solicitud_llamada(numero: str, puerto: int = 7864) -> urllib.request.Request:
+def solicitud_llamada(numero: str, puerto: int = 7864, host: str | None = None) -> urllib.request.Request:
     """Petición al puente para que la asistente llame por WhatsApp a ``numero``."""
     digitos = re.sub(r"\D", "", numero)
     if not NUMERO.match(digitos):
         raise ValueError("Usa el número con código de país, por ejemplo 522221234567")
     datos = json.dumps({"numero": digitos}).encode()
     return urllib.request.Request(
-        f"http://127.0.0.1:{puerto}/llamar",
+        f"http://{host or host_del_puente()}:{puerto}/llamar",
         data=datos,
         method="POST",
         headers={"Content-Type": "application/json"},
@@ -253,7 +257,9 @@ def llamar() -> None:
     puerto = int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864"))
 
     if args.colgar:
-        solicitud = urllib.request.Request(f"http://127.0.0.1:{puerto}/colgar", data=b"{}", method="POST")
+        solicitud = urllib.request.Request(
+            f"http://{host_del_puente()}:{puerto}/colgar", data=b"{}", method="POST"
+        )
         print(_pedir_al_puente(solicitud).get("mensaje", "Listo"))
         return
     if not args.numero:

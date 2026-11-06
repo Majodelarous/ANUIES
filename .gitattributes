@@ -1,0 +1,8 @@
+# Finales de línea LF siempre, también al clonar en Windows (los parches y scripts fallan con CRLF)
+* text=auto eol=lf
+*.patch text eol=lf
+*.ps1 text eol=crlf
+*.wav binary
+*.mp3 binary
+*.png binary
+*.jpg binary

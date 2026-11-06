@@ -12,6 +12,7 @@ ENTORNO_PY := uv run --quiet --no-project python scripts/entorno.py
 # Los procesos de Python escriben al momento y no al final (para que el log salga en orden)
 export PYTHONUNBUFFERED := 1
 
+.PHONY: docker-arriba docker-qr docker-logs docker-abajo docker-llamar docker-persona
 .PHONY: ayuda instalar dev bot puente programador panel test llamar colgar log logs \
 	entorno nuevo-entorno usar poner motor persona personas telefono respaldo limpiar vincular
 
@@ -101,3 +102,26 @@ vincular: ## Quita la sesión de WhatsApp y muestra un QR nuevo para vincular ot
 	@echo "Escanea el QR desde WhatsApp > Dispositivos vinculados del número de la asistente."
 	@echo "Cuando diga Listo, detén con Ctrl+C y levanta todo con: make dev"
 	cd whatsapp && npm run puente
+
+# --- Docker (ver DOCKER.md; en Windows usar .\rous.ps1) ----------------------------------
+
+docker-arriba: ## Construye y levanta todo en contenedores
+	docker compose up -d --build
+	docker compose ps
+
+docker-qr: ## Muestra el QR del puente para vincular WhatsApp
+	docker compose logs -f --no-log-prefix --tail 60 puente
+
+docker-logs: ## Registro en vivo de todos los contenedores
+	docker compose logs -f --tail 100
+
+docker-llamar: ## Rous llama desde el contenedor (NUMERO=52... opcional)
+	docker compose exec bot compania-llamar-wa $(NUMERO)
+
+docker-persona: ## Registra a la persona en el contenedor: NOMBRE= TRATO= TELEFONO= [CONSENTIMIENTO=si]
+	@test -n "$(NOMBRE)" -a -n "$(TRATO)" || (echo 'Uso: make docker-persona NOMBRE="Amada" TRATO="abuelita" TELEFONO=52...' && exit 1)
+	docker compose run --rm bot compania-semilla --nombre "$(NOMBRE)" --trato "$(TRATO)" \
+		$(if $(TELEFONO),--telefono "$(TELEFONO)") $(if $(filter si,$(CONSENTIMIENTO)),--consentimiento)
+
+docker-abajo: ## Detiene los contenedores (los datos se conservan en los volúmenes)
+	docker compose down

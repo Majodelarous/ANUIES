@@ -24,6 +24,8 @@ cargarEnv(join(AQUI, "..", "agente", ".env"));
 
 const PUERTO = Number(process.env.WHATSAPP_PUENTE_PUERTO || 7864);
 const PUERTO_INTERNO = Number(process.env.WHATSAPP_PUENTE_INTERNO || 7865);
+// En Docker se escucha en 0.0.0.0 para que el bot y el programador lleguen desde sus contenedores
+const ESCUCHA = process.env.WHATSAPP_PUENTE_ESCUCHA || "127.0.0.1";
 const ESPERA_MAX_MS = 90_000;
 
 const hora = () => new Date().toLocaleTimeString("es-MX", { hour12: false });
@@ -121,7 +123,7 @@ const servidor = createServer(async (req, res) => {
   }
 });
 
-servidor.listen(PUERTO, "127.0.0.1", () => log(`Atendiendo en http://127.0.0.1:${PUERTO}`));
+servidor.listen(PUERTO, ESCUCHA, () => log(`Atendiendo en http://${ESCUCHA}:${PUERTO}`));
 levantar();
 
 const salir = () => {

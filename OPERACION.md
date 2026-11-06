@@ -1,5 +1,7 @@
 # Operación: instalar, configurar y pasar a datos reales
 
+Esta guía usa `make` (Linux o macOS con Python y Node). En Windows, o para no instalar nada, usar Docker: [DOCKER.md](DOCKER.md).
+
 Guía para dejar a Rous funcionando con una persona real: instalación, entornos separados de prueba y producción, número de WhatsApp de la asistente, perfil de la persona, motor de IA y mantenimiento. Todos los comandos se corren desde la raíz del repositorio. `make` sin nada muestra la lista completa.
 
 ## 1. Requisitos

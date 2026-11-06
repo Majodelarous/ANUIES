@@ -13,6 +13,11 @@ from typing import Protocol
 from loguru import logger
 
 
+def host_del_puente() -> str:
+    """Dónde está el puente de WhatsApp: 127.0.0.1 en local, el nombre del servicio en Docker."""
+    return os.getenv("WHATSAPP_PUENTE_HOST") or "127.0.0.1"
+
+
 class AvisoFamilia(Protocol):
     """Canal para avisar a la familia. La llamada nunca falla si el aviso falla."""
 
@@ -44,8 +49,8 @@ class SinAviso:
 class PuenteWhatsApp:
     """Pide al puente que mande un texto al grupo configurado en ``WHATSAPP_GRUPO``."""
 
-    def __init__(self, puerto: int = 7864, timeout: float = 30):
-        self.base = f"http://127.0.0.1:{puerto}"
+    def __init__(self, puerto: int = 7864, timeout: float = 30, host: str | None = None):
+        self.base = f"http://{host or host_del_puente()}:{puerto}"
         self.timeout = timeout
 
     def _post(self, ruta: str, cuerpo: dict) -> bool:
@@ -87,8 +92,8 @@ def aviso_desde_entorno() -> AvisoFamilia:
 class PuenteLlamadas:
     """Pide llamadas al puente de WhatsApp y consulta cómo terminó la última."""
 
-    def __init__(self, puerto: int = 7864, timeout: float = 120):
-        self.base = f"http://127.0.0.1:{puerto}"
+    def __init__(self, puerto: int = 7864, timeout: float = 120, host: str | None = None):
+        self.base = f"http://{host or host_del_puente()}:{puerto}"
         self.timeout = timeout
 
     def _pedir(self, metodo: str, ruta: str, cuerpo: dict | None = None) -> tuple[int, dict]:

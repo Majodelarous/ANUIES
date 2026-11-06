@@ -39,8 +39,12 @@ const PUERTO = BAJO_SUPERVISOR
   ? Number(process.env.WHATSAPP_PUENTE_INTERNO || 7865)
   : Number(process.env.WHATSAPP_PUENTE_PUERTO || process.env.PUENTE_PUERTO || 7864);
 const BOT_PUERTO = Number(process.env.WHATSAPP_BOT_PUERTO || 7863);
-const BOT_WS_URL = process.env.BOT_WS_URL || `ws://127.0.0.1:${BOT_PUERTO}/wa`;
-const BOT_HTTP_URL = `http://127.0.0.1:${BOT_PUERTO}`;
+// En Docker el bot está en otro contenedor (WHATSAPP_BOT_HOST=bot)
+const BOT_HOST = process.env.WHATSAPP_BOT_HOST || "127.0.0.1";
+const BOT_WS_URL = process.env.BOT_WS_URL || `ws://${BOT_HOST}:${BOT_PUERTO}/wa`;
+const BOT_HTTP_URL = `http://${BOT_HOST}:${BOT_PUERTO}`;
+// Bajo el supervisor el puente solo atiende dentro de su contenedor; solo, puede abrirse (0.0.0.0)
+const ESCUCHA = BAJO_SUPERVISOR ? "127.0.0.1" : process.env.WHATSAPP_PUENTE_ESCUCHA || "127.0.0.1";
 const DURACION_MAX_MS = Number(process.env.DURACION_MAX_MIN || 15) * 60_000;
 const GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
 const PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
@@ -454,8 +458,8 @@ if (GRUPO) {
 }
 if (!PERSONA) log("WHATSAPP_PERSONA vacío: no se buscan imágenes parecidas a las que mande la persona");
 escucharMensajes();
-servidor.listen(PUERTO, "127.0.0.1", () => {
-  log(`Listo. Puente en http://127.0.0.1:${PUERTO}  (bot: ${BOT_WS_URL})`);
+servidor.listen(PUERTO, ESCUCHA, () => {
+  log(`Listo. Puente en http://${ESCUCHA}:${PUERTO}  (bot: ${BOT_WS_URL})`);
   if (BAJO_SUPERVISOR) process.send({ tipo: "listo" });
 });
 

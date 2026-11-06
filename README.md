@@ -65,6 +65,8 @@ Para que la asistente llame por WhatsApp (suena con el celular bloqueado), ver `
 
 Para instalar desde cero, pasar a datos reales, vincular otro número de WhatsApp o cambiar de motor de IA, ver [OPERACION.md](OPERACION.md).
 
+En Windows (o sin instalar Python ni Node), todo corre en contenedores: ver [DOCKER.md](DOCKER.md).
+
 Con Node.js 20 o superior además de uv, desde la raíz del repositorio:
 
 ```bash
