@@ -16,6 +16,7 @@ class PuenteFalso:
         self.grupo: list[str] = []
         self.colgadas = 0
         self.desvinculadas = 0
+        self.reinicios = 0
 
     def estado(self):
         return {"conectado": self.conectado, "en_llamada": False, "grupo": True}
@@ -34,6 +35,10 @@ class PuenteFalso:
     def desvincular(self):
         self.desvinculadas += 1
         return 200, {"mensaje": "Sesión cerrada."}
+
+    def reiniciar(self):
+        self.reinicios += 1
+        return 200, {"mensaje": "Listo"}
 
     def enviar_al_grupo(self, texto):
         self.grupo.append(texto)
@@ -165,3 +170,49 @@ def test_persona_activa_en_la_llamada(repo, persona):
     assert repo.persona_activa().id == otra.id
     repo.guardar_ajuste("persona_activa", "999")
     assert repo.persona_activa().id == persona.id
+
+
+def test_configuracion_viva_y_reinicio_del_puente(cliente, repo, puente, persona, monkeypatch):
+    from compania.infraestructura import configuracion
+
+    monkeypatch.setenv("WHATSAPP_GRUPO", "Familia del env")
+    monkeypatch.delenv("NOMBRE_ASISTENTE", raising=False)
+    assert configuracion.valor(repo, "whatsapp_grupo") == "Familia del env"
+    assert configuracion.origen(repo, "whatsapp_grupo") == ".env"
+    cliente.post(
+        "/control/configuracion",
+        data={"whatsapp_grupo": "Familia López", "whatsapp_prefijo": "", "nombre_asistente": "Rosita"},
+    )
+    assert configuracion.valor(repo, "whatsapp_grupo") == "Familia López"
+    assert configuracion.origen(repo, "whatsapp_grupo") == "panel"
+    assert configuracion.valor(repo, "whatsapp_prefijo") == "abue"  # vacío: se usa el .env o el de siempre
+    assert configuracion.nombre_asistente(repo) == "Rosita"
+    assert puente.reinicios == 1
+    html = cliente.get("/control").text
+    assert 'value="Familia López"' in html and "(de panel)" in html
+
+
+def test_cambiar_perfil_o_numero_reinicia_el_puente(cliente, repo, puente, persona):
+    cliente.post(f"/control/personas/{persona.id}", data={"telefono": "525550002222"})
+    assert puente.reinicios == 1
+    cliente.post(f"/control/personas/{persona.id}", data={"consentimiento": "no"})
+    assert puente.reinicios == 1
+
+
+def test_el_bot_le_da_la_configuracion_al_puente(repo, persona, monkeypatch):
+    from compania.agente.whatsapp import crear_app as crear_bot
+
+    monkeypatch.delenv("WHATSAPP_GRUPO", raising=False)
+    repo.actualizar_telefono(persona.id, "525550003333")
+    repo.guardar_ajuste("whatsapp_grupo", "Familia López")
+    datos = TestClient(crear_bot(repo)).get("/config").json()
+    assert datos == {"grupo": "Familia López", "prefijo": "abue", "persona": "525550003333", "nombre": "Rous"}
+
+
+def test_aviso_usa_el_grupo_del_panel(repo, monkeypatch):
+    from compania.infraestructura.puente_whatsapp import PuenteWhatsApp, SinAviso, aviso_desde_entorno
+
+    monkeypatch.delenv("WHATSAPP_GRUPO", raising=False)
+    assert isinstance(aviso_desde_entorno(repo), SinAviso)
+    repo.guardar_ajuste("whatsapp_grupo", "Familia López")
+    assert isinstance(aviso_desde_entorno(repo), PuenteWhatsApp)

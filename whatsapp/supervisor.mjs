@@ -116,6 +116,9 @@ const servidor = createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/qr") {
     return responder(200, JSON.stringify({ qr: qrActual, conectado: compuerta.abierta }));
   }
+  if (req.method === "POST" && req.url === "/reiniciar" && !compuerta.abierta) {
+    return responder(200, JSON.stringify({ mensaje: "WhatsApp se está conectando; tomará la configuración nueva al terminar." }));
+  }
   if (req.method === "POST" && req.url === "/desvincular" && !compuerta.abierta) {
     const motivo = qrActual ? "No hay celular vinculado: escanea el QR" : "El puente se está reiniciando; intenta en unos segundos";
     return responder(409, JSON.stringify({ error: motivo }));

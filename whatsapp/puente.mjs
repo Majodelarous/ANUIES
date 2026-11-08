@@ -47,9 +47,10 @@ const BOT_HTTP_URL = `http://${BOT_HOST}:${BOT_PUERTO}`;
 // Bajo el supervisor el puente solo atiende dentro de su contenedor; solo, puede abrirse (0.0.0.0)
 const ESCUCHA = BAJO_SUPERVISOR ? "127.0.0.1" : process.env.WHATSAPP_PUENTE_ESCUCHA || "127.0.0.1";
 const DURACION_MAX_MS = Number(process.env.DURACION_MAX_MIN || 15) * 60_000;
-const GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
-const PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
-const PERSONA = (process.env.WHATSAPP_PERSONA || "").replace(/\D/g, "");
+// Valores del .env; al arrancar se reemplazan por lo que se guardó en el panel (GET /config del bot)
+let GRUPO = (process.env.WHATSAPP_GRUPO || "").trim();
+let PREFIJO = process.env.WHATSAPP_PREFIJO || "abue";
+let PERSONA = (process.env.WHATSAPP_PERSONA || "").replace(/\D/g, "");
 const SIN_AUDIO_MS = Number(process.env.WHATSAPP_SIN_AUDIO_S || 30) * 1000;
 const SIN_RESPUESTA_MS = Number(process.env.WHATSAPP_SIN_RESPUESTA_S || 90) * 1000;
 
@@ -413,6 +414,13 @@ const servidor = createServer(async (req, res) => {
       return responder(res, 502, { error: error.message });
     }
   }
+  if (req.method === "POST" && req.url === "/reiniciar") {
+    if (ocupado()) return responder(res, 409, { error: "Hay una llamada en curso; se aplica al terminar" });
+    log("Reinicio pedido por el panel para tomar la configuración nueva");
+    responder(res, 200, { mensaje: "Listo: WhatsApp se reconecta en unos segundos con la configuración nueva." });
+    setTimeout(() => process.exit(0), 300);
+    return;
+  }
   if (req.method === "POST" && req.url === "/desvincular") {
     if (ocupado()) return responder(res, 409, { error: "Hay una llamada en curso; cuélgala primero" });
     log("Se cierra la sesión de WhatsApp a petición del panel para vincular otro celular");
@@ -450,6 +458,27 @@ const servidor = createServer(async (req, res) => {
     return responder(res, 400, { error: error.message });
   }
 });
+
+// Lo que el panel cambia en vivo. Si el bot todavía no responde, se queda lo del .env.
+const cargarConfig = async () => {
+  for (let intento = 1; intento <= 5; intento++) {
+    try {
+      const respuesta = await fetch(`${BOT_HTTP_URL}/config`, { signal: AbortSignal.timeout(3000) });
+      if (respuesta.ok) {
+        const config = await respuesta.json();
+        GRUPO = String(config.grupo ?? GRUPO).trim();
+        PREFIJO = String(config.prefijo || PREFIJO);
+        PERSONA = String(config.persona ?? PERSONA).replace(/\D/g, "");
+        log(`Configuración del panel: grupo "${GRUPO}", prefijo "${PREFIJO}", persona ${PERSONA ? "con número" : "sin número"}`);
+        return;
+      }
+    } catch {
+      // el bot puede estar arrancando
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  log("No se pudo leer la configuración del panel; se usa la del .env");
+};
 
 // Borra los archivos de la sesión (no la carpeta: en Docker es un volumen montado)
 const borrarSesion = async () => {
@@ -491,12 +520,13 @@ cliente.socket.ws.on("CB:call", (nodo) => {
     llamada.end();
   }
 });
+await cargarConfig();
 if (GRUPO) {
   await buscarGrupo().catch((error) => log("No se pudo leer los grupos:", error.message));
 } else {
-  log("WHATSAPP_GRUPO vacío: no se escuchan ni se envían mensajes de la familia");
+  log("Sin grupo de la familia (ni en el panel ni en WHATSAPP_GRUPO): no se escuchan ni se envían mensajes");
 }
-if (!PERSONA) log("WHATSAPP_PERSONA vacío: no se buscan imágenes parecidas a las que mande la persona");
+if (!PERSONA) log("La persona activa no tiene número: no se buscan imágenes parecidas a las que mande");
 escucharMensajes();
 servidor.listen(PUERTO, ESCUCHA, () => {
   log(`Listo. Puente en http://${ESCUCHA}:${PUERTO}  (bot: ${BOT_WS_URL})`);

@@ -34,6 +34,7 @@ from compania.agente.grabadora import Grabadora
 from compania.agente.herramientas import Sesion
 from compania.agente.instrucciones import construir_instrucciones
 from compania.dominio import bienestar
+from compania.infraestructura.configuracion import nombre_asistente
 from compania.infraestructura.puente_whatsapp import aviso_desde_entorno
 from compania.infraestructura.repositorio import Repositorio
 
@@ -225,12 +226,13 @@ async def run_bot(
         seguimientos=repo.seguimientos_abiertos(persona.id),
         recordatorio_de_la_llamada=recordatorio,
         ahora=datetime.now(),
+        nombre=nombre_asistente(repo),
     )
     grabadora = Grabadora()
     sesion = Sesion(
         repo,
         persona.id,
-        aviso=aviso_desde_entorno(),
+        aviso=aviso_desde_entorno(repo),
         trato=persona.trato,
         motivo=recordatorio,
         grabadora=grabadora,

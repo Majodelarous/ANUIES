@@ -22,6 +22,7 @@ from loguru import logger
 
 from compania.dominio.modelos import Alerta, NivelAlerta, Persona
 from compania.dominio.programacion import Tarea, tareas_pendientes
+from compania.infraestructura.configuracion import nombre_asistente
 from compania.infraestructura.puente_whatsapp import AvisoFamilia, PuenteLlamadas, aviso_desde_entorno
 from compania.infraestructura.repositorio import Repositorio
 
@@ -116,7 +117,7 @@ class Programador:
                 logger.info(f"{tarea.clave}: no contestó; se vuelve a marcar en {REINTENTO_S // 60} min")
                 await self.dormir(REINTENTO_S)
 
-        nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
+        nombre = nombre_asistente(self.repo)
         self.repo.guardar_alerta(
             Alerta(persona.id, NivelAlerta.INFORMATIVA, f"No contestó la llamada de las {tarea.hora}")
         )
@@ -163,7 +164,7 @@ async def correr() -> None:
     load_dotenv(override=True)
     repo = Repositorio(os.getenv("RUTA_DB", "compania.db"))
     programador = Programador(
-        repo, PuenteLlamadas(int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864"))), aviso_desde_entorno()
+        repo, PuenteLlamadas(int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864"))), aviso_desde_entorno(repo)
     )
     horarios = ", ".join(h.hora for h in repo.horarios()) or "ninguno"
     logger.info(f"Programador listo. Horarios de llamada: {horarios}. Revisa cada {CADA_S} s.")

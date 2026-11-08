@@ -31,6 +31,7 @@ from compania.dominio.modelos import (
     Seguimiento,
 )
 from compania.dominio.saludos import texto_para_la_persona
+from compania.infraestructura.configuracion import nombre_asistente
 from compania.infraestructura.puente_whatsapp import AvisoFamilia, SinAviso
 from compania.infraestructura.repositorio import Repositorio
 
@@ -458,7 +459,7 @@ class Sesion:
         """Mensaje cálido para el grupo de la familia al terminar la llamada, en un párrafo."""
         t = self.trato
         tiempo = "un ratito" if minutos <= 2 else f"unos {minutos} minutos"
-        nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
+        nombre = nombre_asistente(self.repo)
         if self.motivo:
             partes = [
                 f"Hola, familia, soy {nombre}. Le llamé a {t} para recordarle: {self.motivo.rstrip('.')}."

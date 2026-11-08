@@ -109,8 +109,9 @@ def construir_instrucciones(
     seguimientos: Sequence[Seguimiento] = (),
     recordatorio_de_la_llamada: str = "",
     ahora: datetime | None = None,
+    nombre: str | None = None,
 ) -> str:
-    nombre = os.getenv("NOMBRE_ASISTENTE") or "Rous"
+    nombre = nombre or os.getenv("NOMBRE_ASISTENTE") or "Rous"
     partes = [BASE.format(linea=LINEA_DE_LA_VIDA, nombre=nombre)]
     if ahora is not None:
         partes.append(f"\nHoy es {fecha_hablada(ahora)}. Usa esta hora para recordatorios y saludos.")

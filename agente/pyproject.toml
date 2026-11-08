@@ -16,6 +16,7 @@ dependencies = [
 compania-bot = "compania.agente.bot:main"
 compania-semilla = "compania.agente.semilla:main"
 compania-panel = "compania.panel.app:main"
+compania-panel-clave = "compania.panel.acceso:generar_clave"
 compania-llamar = "compania.agente.llamar:main"
 compania-asterisk = "compania.agente.asterisk:main"
 compania-llamar-app = "compania.agente.asterisk:llamar"

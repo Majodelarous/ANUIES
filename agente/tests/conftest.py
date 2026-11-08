@@ -64,3 +64,13 @@ class ParametrosFalsos:
 
     async def result_callback(self, result: Any, **kwargs: Any) -> None:
         self.resultado = result
+
+
+@pytest.fixture(autouse=True)
+def panel_sin_env_local(monkeypatch):
+    """Las pruebas no leen el .env de la computadora (por ejemplo, PANEL_CLAVE_HASH)."""
+    import compania.panel.app as app_panel
+
+    monkeypatch.setattr(app_panel, "load_dotenv", lambda *a, **k: False)
+    for variable in ("PANEL_CLAVE_HASH", "PANEL_PUBLICO"):
+        monkeypatch.delenv(variable, raising=False)

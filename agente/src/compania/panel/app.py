@@ -21,7 +21,7 @@ from compania.dominio import bienestar
 from compania.dominio.modelos import Horario, MensajeFamiliar, NivelAlerta, Recordatorio, Semaforo
 from compania.infraestructura.puente_whatsapp import ControlPuente
 from compania.infraestructura.repositorio import Repositorio
-from compania.panel import control
+from compania.panel import acceso, control
 
 CSS = (Path(__file__).parent / "estilos.css").read_text(encoding="utf-8")
 
@@ -89,6 +89,9 @@ def _linea_de_llamadas(dias_con_llamada: set[date], hoy: date) -> str:
     return '<div class="llamadas-14">' + "".join(partes) + "</div>"
 
 
+SALIR = '<form method="post" action="/salir" class="salir"><button type="submit" class="secundario">Salir</button></form>'
+
+
 def marco(titulo: str, cuerpo: str, actual: str, quien: str = "") -> str:
     """Página completa con la barra de navegación común."""
     enlaces = (
@@ -107,7 +110,7 @@ def marco(titulo: str, cuerpo: str, actual: str, quien: str = "") -> str:
 <style>{CSS}</style></head>
 <body>
 <header class="barra"><div class="contenido"><span class="marca">Compañía por voz</span>
-<nav>{nav}</nav>{f'<span class="quien">{escape(quien)}</span>' if quien else ""}</div></header>
+<nav>{nav}{SALIR if os.getenv("PANEL_CLAVE_HASH") else ""}</nav>{f'<span class="quien">{escape(quien)}</span>' if quien else ""}</div></header>
 <main>{cuerpo}</main>
 <footer><div class="contenido"><p>La señal de bienestar es una tendencia, no un diagnóstico.
 Si hay riesgo, llame a la Línea de la Vida: 800 911 2000, las 24 horas.</p></div></footer>
@@ -210,6 +213,7 @@ def crear_app(repo: Repositorio | None = None, puente: ControlPuente | None = No
         return RedirectResponse(f"/?persona_id={persona_id}#cuidado", status_code=303)
 
     control.registrar(app, repo, puente or ControlPuente(), marco)
+    acceso.proteger(app, CSS)
     return app
 
 

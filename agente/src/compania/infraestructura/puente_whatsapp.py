@@ -83,8 +83,10 @@ class PuenteWhatsApp:
         return await self._enviar("/enviar-imagen", cuerpo)
 
 
-def aviso_desde_entorno() -> AvisoFamilia:
-    if not os.getenv("WHATSAPP_GRUPO"):
+def aviso_desde_entorno(repo=None) -> AvisoFamilia:
+    """Aviso por el grupo si hay grupo configurado (en el panel o en WHATSAPP_GRUPO)."""
+    grupo = (repo.ajuste("whatsapp_grupo") if repo else None) or os.getenv("WHATSAPP_GRUPO")
+    if not grupo:
         return SinAviso()
     return PuenteWhatsApp(int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864")))
 
@@ -158,6 +160,10 @@ class ControlPuente:
 
     def desvincular(self) -> tuple[int, dict]:
         return self._pedir("POST", "/desvincular")
+
+    def reiniciar(self) -> tuple[int, dict]:
+        """El puente se reconecta y vuelve a leer la configuración del panel."""
+        return self._pedir("POST", "/reiniciar", timeout=8)
 
     def enviar_al_grupo(self, texto: str) -> tuple[int, dict]:
         return self._pedir("POST", "/enviar", {"texto": texto})

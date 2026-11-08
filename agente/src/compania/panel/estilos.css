@@ -192,3 +192,11 @@ tr.elegida td:first-child { box-shadow: inset 4px 0 0 var(--marca); }
 @media (max-width: 720px) {
   form.en-linea button { width: auto; }
 }
+
+/* Entrar */
+.entrar { min-height: 100vh; display: grid; align-items: center; background: var(--banda); }
+.entrar .contenido { max-width: 420px; width: 100%; }
+.entrar form { max-width: none; }
+.entrar button { width: 100%; }
+.aviso-entrar { border-left: 4px solid var(--alerta); background: var(--fondo); padding: var(--e1) var(--e2); font-weight: 700; }
+.barra form.salir { display: inline; max-width: none; margin: 0; align-self: center; }

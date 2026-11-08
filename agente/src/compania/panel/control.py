@@ -32,6 +32,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from compania.agente.bot import MOTORES, falta_para_motor, motor_elegido
 from compania.dominio.modelos import Persona, Recordatorio
+from compania.infraestructura import configuracion
 from compania.infraestructura.puente_whatsapp import ControlPuente
 from compania.infraestructura.repositorio import Repositorio
 
@@ -60,6 +61,15 @@ def mensaje_del_puente(codigo: int, datos: dict, exito: str) -> tuple[str, bool]
 
 def registrar(app: FastAPI, repo: Repositorio, puente: ControlPuente, pagina_base) -> None:
     """Agrega las rutas de control al panel. ``pagina_base(titulo, cuerpo, actual)`` arma la página."""
+
+    def aplicar_en_whatsapp() -> str:
+        """Reinicia el puente para que tome grupo, prefijo y número nuevos."""
+        codigo, datos = puente.reiniciar()
+        if codigo == 200:
+            return " WhatsApp se reconecta en unos segundos con el cambio."
+        if codigo == 409:
+            return " WhatsApp lo toma al terminar la llamada en curso."
+        return " WhatsApp lo toma la próxima vez que se conecte."
 
     def estado() -> dict:
         en_puente = puente.estado()
@@ -150,7 +160,8 @@ def registrar(app: FastAPI, repo: Repositorio, puente: ControlPuente, pagina_bas
             repo.guardar_ajuste("persona_activa", str(persona.id))
         return volver(
             "personas",
-            f"Se registró a {persona.trato}" + (" y quedó como perfil activo." if activar else "."),
+            f"Se registró a {persona.trato}"
+            + (" y quedó como perfil activo." + aplicar_en_whatsapp() if activar else "."),
         )
 
     @app.post("/control/personas/activa")
@@ -160,7 +171,9 @@ def registrar(app: FastAPI, repo: Repositorio, puente: ControlPuente, pagina_bas
             return volver("personas", "Ese perfil no existe.", False)
         repo.guardar_ajuste("persona_activa", str(persona_id))
         return volver(
-            "personas", f"Listo: Rous platica con el perfil de {persona.trato} desde la siguiente llamada."
+            "personas",
+            f"Listo: Rous platica con el perfil de {persona.trato} desde la siguiente llamada."
+            + aplicar_en_whatsapp(),
         )
 
     @app.post("/control/personas/{persona_id}")
@@ -177,7 +190,22 @@ def registrar(app: FastAPI, repo: Repositorio, puente: ControlPuente, pagina_bas
             repo.actualizar_telefono(persona_id, numero)
         if consentimiento in ("si", "no"):
             repo.registrar_consentimiento(persona_id, consentimiento == "si")
-        return volver("personas", f"Se guardaron los cambios de {persona.trato}.")
+        activa = repo.persona_activa()
+        extra = aplicar_en_whatsapp() if numero and activa and activa.id == persona_id else ""
+        return volver("personas", f"Se guardaron los cambios de {persona.trato}." + extra)
+
+    @app.post("/control/configuracion")
+    def guardar_configuracion(
+        whatsapp_grupo: str = Form(""), whatsapp_prefijo: str = Form(""), nombre_asistente: str = Form("")
+    ):
+        nuevos = {
+            "whatsapp_grupo": whatsapp_grupo.strip()[:100],
+            "whatsapp_prefijo": whatsapp_prefijo.strip()[:30],
+            "nombre_asistente": nombre_asistente.strip()[:40],
+        }
+        for clave, texto in nuevos.items():
+            repo.guardar_ajuste(clave, texto)
+        return volver("configuracion", "Configuración guardada." + aplicar_en_whatsapp())
 
     @app.post("/control/recordatorio")
     def recordatorio(texto: str = Form(...), minutos: int = Form(...)):
@@ -283,6 +311,14 @@ def cuerpo_control(repo: Repositorio, aviso: str, tipo: str) -> str:
         else ""
     ) or '<li class="vacio">Sin recordatorios.</li>'
 
+    campos_configuracion = "".join(
+        f'<label>{e(etiqueta)}<input name="{clave}" maxlength="100" value="{e(repo.ajuste(clave) or "")}"'
+        f' placeholder="{e(configuracion.valor(None, clave))}">'
+        f'<span class="nota">Ahora: {e(configuracion.valor(repo, clave) or "sin definir")}'
+        f" (de {configuracion.origen(repo, clave)})</span></label>"
+        for clave, (_, _, etiqueta) in configuracion.AJUSTES.items()
+    )
+
     return f"""{aviso_html}
 <section class="portada" id="estado"><div class="contenido">
 <h1>Control de Rous</h1>
@@ -359,12 +395,17 @@ def cuerpo_control(repo: Repositorio, aviso: str, tipo: str) -> str:
 <button type="submit" class="peligro">Cerrar sesión y mostrar QR nuevo</button></form></div>
 </div></section>
 
-<section id="grupo"><div class="contenido">
-<h2>Grupo de la familia</h2>
-<p>Rous manda aquí el resumen de cada llamada, las alertas y las notas de voz. Envía una prueba para confirmar que llega.</p>
+<section id="configuracion"><div class="contenido rejilla">
+<div><h2>Configuración</h2>
+<p>Se guarda aquí y aplica sin tocar el .env. Al guardar, WhatsApp se reconecta unos segundos. Un campo vacío usa el valor del .env.</p>
+<form method="post" action="/control/configuracion">{campos_configuracion}
+<button type="submit">Guardar configuración</button></form>
+<p class="nota">El número de la abuelita para las imágenes parecidas es el del perfil activo (sección Personas).</p></div>
+<div id="grupo"><h3>Probar el grupo de la familia</h3>
+<p>Rous manda al grupo el resumen de cada llamada, las alertas y las notas de voz.</p>
 <form method="post" action="/control/grupo">
 <label>Mensaje<input name="texto" required maxlength="500" value="Prueba desde el panel de Rous"></label>
-<button type="submit">Enviar al grupo</button></form>
+<button type="submit">Enviar al grupo</button></form></div>
 </div></section>
 {SCRIPT_ESTADO}"""
 
@@ -383,10 +424,11 @@ SCRIPT_ESTADO = """<script>
   const revisar = async () => {
     try {
       const r = await fetch("/control/estado", { cache: "no-store" });
+      if (r.status === 401) { location.href = "/entrar?siguiente=/control"; return; }
       const s = await r.json();
       poner("whatsapp", texto.whatsapp[s.whatsapp] || s.whatsapp);
       poner("en_llamada", s.whatsapp === "vinculado" ? (s.en_llamada ? "En curso" : "Libre") : "Sin datos");
-      poner("grupo", s.whatsapp === "vinculado" ? (s.grupo ? "Encontrado" : "No encontrado: revisa WHATSAPP_GRUPO") : "Sin datos");
+      poner("grupo", s.whatsapp === "vinculado" ? (s.grupo ? "Encontrado" : "No encontrado: revisa el nombre en Configuración") : "Sin datos");
       if (qr) {
         qr.hidden = !s.hay_qr;
         if (s.hay_qr) img.src = "/control/qr.svg?t=" + Date.now();
@@ -419,7 +461,7 @@ GUIA = """<section class="portada"><div class="contenido">
 <li><strong>Un solo puente encendido.</strong> Si Rous corre aquí, apaga el de cualquier otra computadora. Con dos sesiones activas Rous puede contestar doble.</li>
 <li><strong>Perfil correcto.</strong> En <a href="/control#personas">Personas</a>, el perfil activo es el de la abuelita, con su WhatsApp con código de país (52 y 10 dígitos). Si ya firmó el consentimiento, márcalo; si no, Rous se lo pide de palabra en la primera llamada.</li>
 <li><strong>Motor de voz.</strong> En <a href="/control#motor">Motor de voz</a> elige el que mejor suene en sus pruebas. El cambio aplica en la siguiente llamada.</li>
-<li><strong>Grupo de la familia.</strong> En <a href="/control#grupo">Grupo</a>, envía una prueba y confirma que llega. Ahí llegan los resúmenes y avisos.</li>
+<li><strong>Grupo de la familia.</strong> En <a href="/control#configuracion">Configuración</a>, revisa el nombre exacto del grupo y envía una prueba. Ahí llegan los resúmenes y avisos.</li>
 <li><strong>Celular de la abuelita.</strong> Con internet, volumen alto y WhatsApp abierto al menos una vez. No necesita estar desbloqueado.</li>
 <li><strong>Llamada de ensayo.</strong> Haz una llamada corta con "Llamar ahora" y cuelga. Así confirmas audio, motor y número.</li>
 </ol>
@@ -444,7 +486,7 @@ GUIA = """<section class="portada"><div class="contenido">
 <li><strong>La familia programa una llamada.</strong> En el grupo: "Abue, salgo a las 5, a esa hora te marco". Rous se lo dice en la siguiente llamada y a esa hora le recuerda al familiar.</li>
 <li><strong>Recordatorio rápido.</strong> En <a href="/control#recordatorios">Recordatorio de prueba</a>, pon 2 o 3 minutos. Rous llama, recuerda y cuelga.</li>
 <li><strong>Si no contesta.</strong> Rous vuelve a marcar una vez y, si tampoco contesta, avisa al grupo. Funciona con las llamadas programadas y los recordatorios.</li>
-<li><strong>Imágenes parecidas.</strong> La abuelita le manda una foto al chat de la asistente y Rous le regresa tres imágenes parecidas para reenviar. Solo funciona desde el número de WHATSAPP_PERSONA del .env.</li>
+<li><strong>Imágenes parecidas.</strong> La abuelita le manda una foto al chat de la asistente y Rous le regresa tres imágenes parecidas para reenviar. Funciona desde el número del perfil activo.</li>
 <li><strong>Página de la familia.</strong> Muestra la señal de bienestar, las llamadas de 14 días, recordatorios, alertas y los recuerdos que quiso compartir.</li>
 </ol>
 </div></section>
@@ -456,7 +498,7 @@ GUIA = """<section class="portada"><div class="contenido">
 <tr><td>La llamada se cuelga a los pocos segundos</td><td>El puente vuelve a marcar una vez solo. Si no, colgar y llamar otra vez.</td></tr>
 <tr><td>Dice "Reconectando" un rato</td><td>Es normal unos segundos después de cada llamada. Si pasa de un minuto, revisa el registro del puente.</td></tr>
 <tr><td>Rous no dice el nombre correcto</td><td>Revisa el perfil activo en Personas.</td></tr>
-<tr><td>No llega nada al grupo</td><td>En Control, el grupo debe decir "Encontrado". El nombre del grupo está en WHATSAPP_GRUPO del .env.</td></tr>
+<tr><td>No llega nada al grupo</td><td>En Control, el grupo debe decir "Encontrado". Si no, revisa el nombre exacto en Configuración y que el WhatsApp de la asistente esté en el grupo.</td></tr>
 <tr><td>Un motor aparece desactivado</td><td>Falta su llave en el .env. Agrégala y reinicia los contenedores.</td></tr>
 </tbody></table>
 </div></section>

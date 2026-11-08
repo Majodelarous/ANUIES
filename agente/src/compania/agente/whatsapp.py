@@ -44,6 +44,7 @@ from pipecat.frames.frames import (
 from pipecat.serializers.base_serializer import FrameSerializer
 from pydantic import BaseModel, Field
 
+from compania.infraestructura.configuracion import para_el_puente
 from compania.infraestructura.puente_whatsapp import host_del_puente
 
 FRECUENCIA = 16000
@@ -105,12 +106,15 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None, imagenes=None
 
     def persona_actual():
         persona_id = os.getenv("PERSONA_ID")
-        persona = (
-            repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.persona_activa()
-        )
+        persona = repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.persona_activa()
         if persona is None or persona.id is None:
             raise HTTPException(404, "No hay persona registrada")
         return persona
+
+    @app.get("/config")
+    def configuracion_para_el_puente() -> dict:
+        """Grupo, prefijo, número de la persona y nombre: lo que el panel cambia en vivo."""
+        return para_el_puente(repositorio)
 
     @app.post("/imagenes/parecidas")
     async def imagenes_parecidas(entrada: ImagenEntrante) -> dict:

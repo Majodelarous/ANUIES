@@ -1,0 +1,56 @@
+"""Configuración que se cambia en vivo desde el panel.
+
+Cada valor sale de la tabla ``ajustes`` (lo que guardó el panel) y, si no hay, del .env.
+Las llaves de los motores no van aquí: siguen en el .env.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+
+from compania.infraestructura.repositorio import Repositorio
+
+# clave en la base: (variable del .env, valor por omisión, etiqueta para el panel)
+AJUSTES = {
+    "whatsapp_grupo": ("WHATSAPP_GRUPO", "", "Nombre del grupo de la familia"),
+    "whatsapp_prefijo": ("WHATSAPP_PREFIJO", "abue", "Palabra con la que la familia le habla a la abuelita"),
+    "nombre_asistente": ("NOMBRE_ASISTENTE", "Rous", "Nombre de la asistente"),
+}
+
+
+def valor(repo: Repositorio | None, clave: str) -> str:
+    variable, omision, _ = AJUSTES[clave]
+    guardado = repo.ajuste(clave) if repo else None
+    if guardado and guardado.strip():
+        return guardado.strip()
+    return (os.getenv(variable) or omision).strip()
+
+
+def origen(repo: Repositorio, clave: str) -> str:
+    """De dónde sale el valor: panel, .env o valor por omisión."""
+    guardado = repo.ajuste(clave)
+    if guardado and guardado.strip():
+        return "panel"
+    return ".env" if os.getenv(AJUSTES[clave][0]) else "omisión"
+
+
+def nombre_asistente(repo: Repositorio | None = None) -> str:
+    return valor(repo, "nombre_asistente") or "Rous"
+
+
+def numero_de_la_persona(repo: Repositorio | None = None) -> str:
+    """WhatsApp de la persona activa; si no tiene, WHATSAPP_PERSONA del .env."""
+    persona = repo.persona_activa() if repo else None
+    numero = (persona.telefono if persona else None) or os.getenv("WHATSAPP_PERSONA") or ""
+    return re.sub(r"\D", "", numero)
+
+
+def para_el_puente(repo: Repositorio) -> dict:
+    """Lo que el puente de WhatsApp lee al arrancar."""
+    return {
+        "grupo": valor(repo, "whatsapp_grupo"),
+        "prefijo": valor(repo, "whatsapp_prefijo"),
+        "persona": numero_de_la_persona(repo),
+        "nombre": nombre_asistente(repo),
+    }
