@@ -8,7 +8,13 @@ cd "$(dirname "$0")"
 
 ENV_LOCAL="${1:-../agente/.env}"
 [ -f "$ENV_LOCAL" ] || { echo "No existe $ENV_LOCAL"; exit 1; }
+if ! grep -q '^PANEL_CLAVE_HASH=pbkdf2_sha256:' "$ENV_LOCAL"; then
+  echo "Falta PANEL_CLAVE_HASH en $ENV_LOCAL: el panel queda en internet y necesita contraseña."
+  echo "Genérala con: (cd ../agente && uv run compania-panel-clave)"
+  exit 1
+fi
 IP="$(terraform output -raw ip)"
+DOMINIO="$(terraform output -raw dominio)"
 DESTINO="ubuntu@$IP"
 SSH=(ssh -o StrictHostKeyChecking=accept-new "$DESTINO")
 
@@ -21,9 +27,15 @@ trap 'rm -f "$TEMPORAL"' EXIT
 grep -v '^AWS_PROFILE=' "$ENV_LOCAL" > "$TEMPORAL"
 scp -q "$TEMPORAL" "$DESTINO:/opt/rous/agente/.env"
 
-"${SSH[@]}" 'chmod 600 /opt/rous/agente/.env && cd /opt/rous && git pull --ff-only && docker compose up -d --build && docker compose ps'
+# En el servidor, docker compose usa también docker-compose.nube.yml (Caddy) y el dominio
+"${SSH[@]}" "printf 'COMPOSE_FILE=docker-compose.yml:docker-compose.nube.yml\nROUS_DOMINIO=%s\n' '$DOMINIO' > /opt/rous/.env"
+"${SSH[@]}" 'chmod 600 /opt/rous/agente/.env && cd /opt/rous && git pull --ff-only && docker compose up -d --build --remove-orphans && docker compose ps'
 
+if [ "$(dig +short "$DOMINIO" 2>/dev/null | tail -1)" != "$IP" ]; then
+  echo
+  echo "Ojo: $DOMINIO todavía no apunta a $IP. En Cloudflare:"
+  echo "  $(terraform output -raw cloudflare)"
+  echo "Caddy saca el certificado solo en cuanto el registro exista."
+fi
 echo
-echo "Listo. Para el panel, en otra terminal:"
-echo "  $(terraform output -raw panel)"
-echo "y abre http://127.0.0.1:7861/control"
+echo "Listo: $(terraform output -raw panel)"

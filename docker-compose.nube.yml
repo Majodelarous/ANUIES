@@ -1,0 +1,27 @@
+# Solo en el servidor: Caddy con HTTPS (Let's Encrypt) delante del panel, que pide contraseña.
+# En el servidor lo activa COMPOSE_FILE en /opt/rous/.env (lo escribe infra/desplegar.sh).
+# A mano: docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build
+services:
+  panel:
+    environment:
+      # Sin PANEL_CLAVE_HASH en agente/.env el panel no abre
+      PANEL_PUBLICO: "1"
+
+  caddy:
+    image: caddy:2.11.8-alpine
+    restart: unless-stopped
+    depends_on: [panel]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ROUS_DOMINIO: ${ROUS_DOMINIO:?Falta ROUS_DOMINIO en /opt/rous/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-datos:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-datos:
+  caddy-config:

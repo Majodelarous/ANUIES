@@ -1,5 +1,5 @@
 # Una instancia EC2 con Docker que corre docker-compose.yml tal cual.
-# Solo se abre el puerto 22 a tu IP; el panel se usa por un túnel SSH y nunca queda en internet.
+# SSH solo desde tu IP. El panel queda en https://<dominio> con contraseña, detrás de Caddy.
 
 data "aws_ami" "ubuntu" {
   most_recent = true
@@ -22,7 +22,7 @@ data "aws_vpc" "predeterminada" {
 
 resource "aws_security_group" "rous" {
   name        = "${var.nombre}-ssh"
-  description = "Solo SSH desde la IP de quien administra"
+  description = "SSH desde la IP de quien administra y HTTPS para el panel"
   vpc_id      = data.aws_vpc.predeterminada.id
 }
 
@@ -33,6 +33,27 @@ resource "aws_vpc_security_group_ingress_rule" "ssh" {
   ip_protocol       = "tcp"
   from_port         = 22
   to_port           = 22
+}
+
+# 80 y 443 abiertos a todos: el panel pide contraseña y Caddy sirve HTTPS (el 80 solo redirige
+# y sirve el reto de Let's Encrypt)
+resource "aws_vpc_security_group_ingress_rule" "web" {
+  for_each          = toset(["80", "443"])
+  security_group_id = aws_security_group.rous.id
+  description       = "Panel por HTTPS"
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = tonumber(each.value)
+  to_port           = tonumber(each.value)
+}
+
+resource "aws_vpc_security_group_ingress_rule" "http3" {
+  security_group_id = aws_security_group.rous.id
+  description       = "Panel por HTTP/3"
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "udp"
+  from_port         = 443
+  to_port           = 443
 }
 
 resource "aws_vpc_security_group_egress_rule" "salida" {
@@ -128,5 +149,15 @@ resource "aws_instance" "rous" {
 
   lifecycle {
     ignore_changes = [ami]
+  }
+}
+
+# IP fija: el registro A de Cloudflare no cambia aunque la instancia se reinicie
+resource "aws_eip" "rous" {
+  domain   = "vpc"
+  instance = aws_instance.rous.id
+
+  tags = {
+    Name = var.nombre
   }
 }

@@ -56,6 +56,12 @@ variable "rama" {
   default     = "panel-control"
 }
 
+variable "dominio" {
+  description = "Dominio del panel. En Cloudflare: registro A hacia la IP fija, sin proxy (nube gris)."
+  type        = string
+  default     = "rous.foor.dev"
+}
+
 variable "permitir_nova" {
   description = "Da permiso a la instancia para usar Nova Sonic en Bedrock, sin llaves de AWS en el .env."
   type        = bool

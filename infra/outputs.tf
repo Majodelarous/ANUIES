@@ -1,6 +1,20 @@
 output "ip" {
-  description = "IP pública del servidor (cambia si la instancia se detiene y se vuelve a encender)."
-  value       = aws_instance.rous.public_ip
+  description = "IP fija del servidor (Elastic IP)."
+  value       = aws_eip.rous.public_ip
+}
+
+output "dominio" {
+  value = var.dominio
+}
+
+output "panel" {
+  description = "Liga del panel (pide la contraseña de PANEL_CLAVE_HASH)."
+  value       = "https://${var.dominio}/control"
+}
+
+output "cloudflare" {
+  description = "Registro que hay que crear en Cloudflare antes de desplegar."
+  value       = "Tipo A, nombre ${split(".", var.dominio)[0]}, contenido ${aws_eip.rous.public_ip}, proxy desactivado (solo DNS, nube gris), TTL automático"
 }
 
 output "instancia" {
@@ -8,12 +22,12 @@ output "instancia" {
 }
 
 output "ssh" {
-  value = "ssh ubuntu@${aws_instance.rous.public_ip}"
+  value = "ssh ubuntu@${aws_eip.rous.public_ip}"
 }
 
-output "panel" {
-  description = "Abre el túnel y luego entra a http://127.0.0.1:7861 en tu navegador."
-  value       = "ssh -N -L 7861:127.0.0.1:7861 ubuntu@${aws_instance.rous.public_ip}"
+output "tunel" {
+  description = "Plan B si el dominio falla: túnel SSH y luego http://127.0.0.1:7861/control"
+  value       = "ssh -N -L 7861:127.0.0.1:7861 ubuntu@${aws_eip.rous.public_ip}"
 }
 
 output "sin_ssh" {

@@ -1,0 +1,13 @@
+# HTTPS para el panel. Caddy saca y renueva el certificado de Let's Encrypt solo.
+{$ROUS_DOMINIO} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+	reverse_proxy panel:7861
+}
