@@ -54,7 +54,7 @@ En `agente/.env` llenar al menos:
 - `MOTOR_VOZ`: `gemini`, `openai` o `nova`.
 - `WHATSAPP_ASISTENTE`, `WHATSAPP_PERSONA` y `WHATSAPP_GRUPO`.
 
-No hace falta tocar puertos ni direcciones: `docker-compose.yml` los fija para los contenedores.
+No hace falta tocar puertos ni direcciones: `docker-compose.yml` los fija para los contenedores. Los contenedores usan la hora de México (`TZ`); para otra zona, define `ROUS_TZ` antes de levantar, por ejemplo `$env:ROUS_TZ = "America/Tijuana"`.
 
 ## 4. Levantar todo
 
@@ -72,6 +72,8 @@ Sin el script, el equivalente es `docker compose up -d --build`.
 
 ## 5. Vincular WhatsApp
 
+Lo más fácil es desde el panel: abre http://127.0.0.1:7861/control y escanea el QR de la sección "WhatsApp de la asistente". También se puede ver en la terminal:
+
 ```powershell
 .\rous.ps1 qr
 ```
@@ -79,6 +81,8 @@ Sin el script, el equivalente es `docker compose up -d --build`.
 Aparece un QR. En el celular de la asistente: WhatsApp, Dispositivos vinculados, Vincular un dispositivo. Cuando el registro diga "Listo", salir con Ctrl+C (los contenedores siguen corriendo). La sesión queda guardada en el volumen `auth`.
 
 ## 6. Registrar a la persona y probar
+
+Todo esto también se hace con botones en http://127.0.0.1:7861/control (personas, llamar, colgar, motor, recordatorio de prueba). La guía para grabar la demo está en http://127.0.0.1:7861/guia. Con la terminal:
 
 ```powershell
 .\rous.ps1 persona -Nombre "Amada López" -Trato abuelita -Telefono 522221234567
@@ -132,6 +136,6 @@ Solo puede correr un entorno a la vez porque comparten el puerto del panel.
 | El QR no se ve bien | Agrandar la ventana de la terminal o reducir el tamaño de letra |
 | La llamada se cuelga a los 5 s | El puente vuelve a marcar solo una vez; guardar el registro (`.\rous.ps1 logs puente`) |
 
-## 10. Hacia el despliegue
+## 10. Despliegue
 
-`[INFERENCIA]` Este mismo `docker-compose.yml` sirve en un servidor con Docker (por ejemplo, una máquina virtual en AWS) sin cambios. Para servicios que corren cada contenedor por separado, como Railway, hay que revisar dos cosas antes: los tres servicios del agente comparten la base SQLite en un mismo volumen, y la sesión de WhatsApp necesita un volumen persistente.
+Para correrlo en AWS (una EC2 con este mismo `docker-compose.yml`, creada con Terraform), ver [infra/README.md](infra/README.md). Servicios que corren cada contenedor por separado, como Railway, no sirven tal cual: los tres servicios del agente comparten la base SQLite en un mismo volumen.

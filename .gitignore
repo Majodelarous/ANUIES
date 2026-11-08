@@ -14,3 +14,11 @@ logs/
 respaldos/
 agente/datos/
 whatsapp/auth-*/
+
+# Terraform (infra/)
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+infra/backend.tf
+infra/.terraform.tfstate.lock.info

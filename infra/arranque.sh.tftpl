@@ -1,0 +1,28 @@
+#!/bin/bash
+# Primer arranque: Docker, memoria de intercambio y el código en /opt/rous.
+# El .env no viaja aquí (quedaría en el estado de Terraform y en los datos de la instancia):
+# se sube después con desplegar.sh.
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y docker.io docker-compose-v2 git
+systemctl enable --now docker
+usermod -aG docker ubuntu
+timedatectl set-timezone America/Mexico_City
+
+# 2 GB de RAM: el intercambio evita que la construcción de imágenes se quede sin memoria
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+if [ ! -d /opt/rous/.git ]; then
+  git clone --branch "${rama}" "${repositorio}" /opt/rous
+  chown -R ubuntu:ubuntu /opt/rous
+fi
+
+touch /var/lib/cloud/instance/rous-listo

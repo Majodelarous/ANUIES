@@ -1,0 +1,13 @@
+# Estado remoto en S3. Para usarlo: copia este archivo como backend.tf, pon tu bucket y corre
+#   terraform init -migrate-state
+# Sin backend.tf el estado queda local en terraform.tfstate (no se sube a git).
+terraform {
+  backend "s3" {
+    bucket       = "NOMBRE-DE-TU-BUCKET"
+    key          = "rous/ec2.tfstate"
+    region       = "us-east-1"
+    profile      = "Fortino-IAM-Admin"
+    encrypt      = true
+    use_lockfile = true
+  }
+}

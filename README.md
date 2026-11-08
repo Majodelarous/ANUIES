@@ -65,7 +65,9 @@ Para que la asistente llame por WhatsApp (suena con el celular bloqueado), ver `
 
 Para instalar desde cero, pasar a datos reales, vincular otro número de WhatsApp o cambiar de motor de IA, ver [OPERACION.md](OPERACION.md).
 
-En Windows (o sin instalar Python ni Node), todo corre en contenedores: ver [DOCKER.md](DOCKER.md).
+En Windows (o sin instalar Python ni Node), todo corre en contenedores: ver [DOCKER.md](DOCKER.md). Para el servidor en AWS con Terraform: [infra/README.md](infra/README.md).
+
+El panel (http://localhost:7861) tiene una página de control con botones para llamar, colgar, registrar personas, cambiar de motor y vincular WhatsApp, y una guía para grabar la demo en `/guia`.
 
 Con Node.js 20 o superior además de uv, desde la raíz del repositorio:
 

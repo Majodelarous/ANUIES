@@ -1,0 +1,5 @@
+# Copia como terraform.tfvars (no se sube a git) y ajusta.
+mi_ip = "203.0.113.10/32" # curl -s https://checkip.amazonaws.com
+# llave_publica = "~/.ssh/id_ed25519.pub"
+# perfil_aws    = "Fortino-IAM-Admin"
+# rama          = "panel-control"
