@@ -38,16 +38,22 @@ let caidasSeguidas = 0;
 let reintentoPendiente = null;
 // Resultado de la última llamada, para el programador (sobrevive a los reinicios del puente)
 let ultima = null;
+// QR para vincular el celular de la asistente, mientras el puente espera que lo escaneen
+let qrActual = null;
 
 const levantar = () => {
   const inicio = Date.now();
   compuerta.cerrar();
+  qrActual = null;
   puente = fork(join(AQUI, "puente.mjs"), [], {
     env: { ...process.env, WHATSAPP_PUENTE_INTERNO: String(PUERTO_INTERNO), BAJO_SUPERVISOR: "1" },
   });
 
   puente.on("message", (m) => {
-    if (m?.tipo === "listo") {
+    if (m?.tipo === "qr") {
+      qrActual = m.qr;
+    } else if (m?.tipo === "listo") {
+      qrActual = null;
       caidasSeguidas = 0;
       compuerta.abrir();
       if (reintentoPendiente) {
@@ -107,6 +113,13 @@ const servidor = createServer(async (req, res) => {
     res.writeHead(codigo, { "Content-Type": "application/json; charset=utf-8" });
     res.end(texto);
   };
+  if (req.method === "GET" && req.url === "/qr") {
+    return responder(200, JSON.stringify({ qr: qrActual, conectado: compuerta.abierta }));
+  }
+  if (req.method === "POST" && req.url === "/desvincular" && !compuerta.abierta) {
+    const motivo = qrActual ? "No hay celular vinculado: escanea el QR" : "El puente se está reiniciando; intenta en unos segundos";
+    return responder(409, JSON.stringify({ error: motivo }));
+  }
   if (req.method === "GET" && req.url === "/ultima-llamada") {
     return responder(200, JSON.stringify(ultima ?? {}));
   }

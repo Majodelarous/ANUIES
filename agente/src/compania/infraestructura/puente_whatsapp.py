@@ -115,3 +115,49 @@ class PuenteLlamadas:
     async def ultima_llamada(self) -> dict:
         _, datos = await asyncio.to_thread(self._pedir, "GET", "/ultima-llamada")
         return datos
+
+
+class ControlPuente:
+    """Lo que el panel le pide al puente: estado, QR, llamar, colgar, desvincular y mensajes."""
+
+    def __init__(self, puerto: int | None = None, host: str | None = None):
+        puerto = puerto or int(os.getenv("WHATSAPP_PUENTE_PUERTO", "7864"))
+        self.base = f"http://{host or host_del_puente()}:{puerto}"
+
+    def _pedir(
+        self, metodo: str, ruta: str, cuerpo: dict | None = None, timeout: float = 30
+    ) -> tuple[int, dict]:
+        datos = json.dumps(cuerpo or {}).encode() if metodo == "POST" else None
+        solicitud = urllib.request.Request(
+            self.base + ruta, data=datos, method=metodo, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(solicitud, timeout=timeout) as respuesta:
+                return respuesta.status, json.loads(respuesta.read() or b"{}")
+        except urllib.error.HTTPError as error:
+            try:
+                return error.code, json.loads(error.read() or b"{}")
+            except ValueError:
+                return error.code, {"error": f"El puente respondió {error.code}"}
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            return 0, {"error": "El puente de WhatsApp no responde. Revisa que esté encendido."}
+
+    def estado(self) -> dict:
+        codigo, datos = self._pedir("GET", "/estado", timeout=4)
+        return datos if codigo == 200 else {"apagado": True, **datos}
+
+    def qr(self) -> str | None:
+        codigo, datos = self._pedir("GET", "/qr", timeout=4)
+        return datos.get("qr") if codigo == 200 else None
+
+    def llamar(self, numero: str) -> tuple[int, dict]:
+        return self._pedir("POST", "/llamar", {"numero": numero, "motivo": "manual"})
+
+    def colgar(self) -> tuple[int, dict]:
+        return self._pedir("POST", "/colgar")
+
+    def desvincular(self) -> tuple[int, dict]:
+        return self._pedir("POST", "/desvincular")
+
+    def enviar_al_grupo(self, texto: str) -> tuple[int, dict]:
+        return self._pedir("POST", "/enviar", {"texto": texto})

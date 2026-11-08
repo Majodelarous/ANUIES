@@ -11,14 +11,17 @@ import os
 from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 from compania.dominio import bienestar
 from compania.dominio.modelos import Horario, MensajeFamiliar, NivelAlerta, Recordatorio, Semaforo
+from compania.infraestructura.puente_whatsapp import ControlPuente
 from compania.infraestructura.repositorio import Repositorio
+from compania.panel import control
 
 CSS = (Path(__file__).parent / "estilos.css").read_text(encoding="utf-8")
 
@@ -86,15 +89,48 @@ def _linea_de_llamadas(dias_con_llamada: set[date], hoy: date) -> str:
     return '<div class="llamadas-14">' + "".join(partes) + "</div>"
 
 
-def crear_app(repo: Repositorio | None = None) -> FastAPI:
+def marco(titulo: str, cuerpo: str, actual: str, quien: str = "") -> str:
+    """Página completa con la barra de navegación común."""
+    enlaces = (
+        ("familia", "/", "Familia"),
+        ("control", "/control", "Control"),
+        ("guia", "/guia", "Guía de la demo"),
+    )
+    nav = "".join(
+        f'<a href="{ruta}"{' aria-current="page"' if clave == actual else ""}>{texto}</a>'
+        for clave, ruta, texto in enlaces
+    )
+    return f"""<!doctype html>
+<html lang="es-MX"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{escape(titulo)}</title>
+<style>{CSS}</style></head>
+<body>
+<header class="barra"><div class="contenido"><span class="marca">Compañía por voz</span>
+<nav>{nav}</nav>{f'<span class="quien">{escape(quien)}</span>' if quien else ""}</div></header>
+<main>{cuerpo}</main>
+<footer><div class="contenido"><p>La señal de bienestar es una tendencia, no un diagnóstico.
+Si hay riesgo, llame a la Línea de la Vida: 800 911 2000, las 24 horas.</p></div></footer>
+</body></html>"""
+
+
+def crear_app(repo: Repositorio | None = None, puente: ControlPuente | None = None) -> FastAPI:
     load_dotenv(override=True)
     repo = repo or Repositorio(os.getenv("RUTA_DB", "compania.db"))
     app = FastAPI(title="Panel familiar")
 
+    @app.middleware("http")
+    async def mismo_origen(request: Request, call_next):
+        """Los botones llaman y cambian datos: se rechaza un POST que venga de otro sitio."""
+        origen = request.headers.get("origin")
+        if request.method == "POST" and origen and urlparse(origen).netloc != request.headers.get("host"):
+            return PlainTextResponse("Petición de otro sitio rechazada", status_code=403)
+        return await call_next(request)
+
     def persona_o_404(persona_id: int | None):
-        persona = repo.obtener_persona(persona_id) if persona_id else repo.primera_persona()
+        persona = repo.obtener_persona(persona_id) if persona_id else repo.persona_activa()
         if persona is None or persona.id is None:
-            raise HTTPException(404, "No hay persona registrada. Ejecuta: uv run compania-semilla --help")
+            raise HTTPException(404, "No hay persona registrada. Regístrala en /control#personas")
         return persona
 
     def resumen(persona_id: int | None) -> dict:
@@ -138,7 +174,11 @@ def crear_app(repo: Repositorio | None = None) -> FastAPI:
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def inicio(persona_id: int | None = None) -> str:
+    def inicio(persona_id: int | None = None):
+        if persona_id is None and repo.persona_activa() is None:
+            return RedirectResponse(
+                "/control?aviso=Primero+registra+a+la+persona.&tipo=error#personas", status_code=303
+            )
         return pagina(resumen(persona_id))
 
     @app.post("/recordatorios")
@@ -169,6 +209,7 @@ def crear_app(repo: Repositorio | None = None) -> FastAPI:
         repo.guardar_mensaje(MensajeFamiliar(persona_id, de.strip(), texto.strip()))
         return RedirectResponse(f"/?persona_id={persona_id}#cuidado", status_code=303)
 
+    control.registrar(app, repo, puente or ControlPuente(), marco)
     return app
 
 
@@ -230,16 +271,7 @@ def pagina(datos: dict) -> str:
         if persona.consentimiento
         else "Rous le pedirá permiso en la próxima llamada antes de guardar recuerdos."
     )
-    return f"""<!doctype html>
-<html lang="es-MX"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panel familiar de {e(persona.trato)}</title>
-<style>{CSS}</style></head>
-<body>
-<header class="barra"><div class="contenido"><span class="marca">Compañía por voz</span>
-<span class="quien">{e(persona.trato)}</span></div></header>
-<main>
-<section class="portada"><div class="contenido">
+    cuerpo = f"""<section class="portada"><div class="contenido">
 <h1>¿Cómo ha estado {e(persona.trato)}?</h1>
 <div class="senal {senal.semaforo.value}">
   <span class="figura" aria-hidden="true"></span>
@@ -286,10 +318,8 @@ def pagina(datos: dict) -> str:
 <h2>Recuerdos que quiso compartir</h2>
 <ul class="lista">{recuerdos}</ul>
 </div></section>
-</main>
-<footer><div class="contenido"><p>La señal de bienestar es una tendencia, no un diagnóstico.
-Si hay riesgo, llame a la Línea de la Vida: 800 911 2000, las 24 horas.</p></div></footer>
-</body></html>"""
+"""
+    return marco(f"Panel familiar de {persona.trato}", cuerpo, "familia", persona.trato)
 
 
 def main() -> None:

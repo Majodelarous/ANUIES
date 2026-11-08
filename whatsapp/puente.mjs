@@ -20,6 +20,7 @@
  * Lee ../agente/.env. Variables: WHATSAPP_GRUPO, WHATSAPP_PREFIJO (abue), WA_AUTH_DIR (./auth),
  * WHATSAPP_PUENTE_PUERTO (7864), WHATSAPP_BOT_PUERTO (7863), DURACION_MAX_MIN (15).
  */
+import { readdir, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -412,6 +413,22 @@ const servidor = createServer(async (req, res) => {
       return responder(res, 502, { error: error.message });
     }
   }
+  if (req.method === "POST" && req.url === "/desvincular") {
+    if (ocupado()) return responder(res, 409, { error: "Hay una llamada en curso; cuélgala primero" });
+    log("Se cierra la sesión de WhatsApp a petición del panel para vincular otro celular");
+    responder(res, 200, { mensaje: "Sesión cerrada. En unos segundos aparece un QR nuevo." });
+    setTimeout(async () => {
+      await borrarSesion();
+      try {
+        await cliente.socket.logout();
+      } catch (error) {
+        log("WhatsApp no confirmó el cierre de sesión:", error.message);
+      }
+      await borrarSesion();
+      process.exit(0);
+    }, 300);
+    return;
+  }
   if (req.method !== "POST" || req.url !== "/llamar") {
     return responder(res, 404, { error: "Ruta no encontrada" });
   }
@@ -434,8 +451,31 @@ const servidor = createServer(async (req, res) => {
   }
 });
 
-log("Conectando con WhatsApp (si aparece un QR, escanéalo desde el celular de la asistente)...");
+// Borra los archivos de la sesión (no la carpeta: en Docker es un volumen montado)
+const borrarSesion = async () => {
+  const archivos = await readdir(AUTH_DIR).catch(() => []);
+  await Promise.all(archivos.map((nombre) => rm(join(AUTH_DIR, nombre), { recursive: true, force: true })));
+};
+
+// La librería solo dibuja el QR en la terminal. Se escucha el mismo evento en cada socket que
+// crea (reintenta si falla) y se manda al supervisor, que lo sirve al panel en /qr.
+const vigilarQr = () => {
+  let visto = null;
+  const vigia = setInterval(() => {
+    const sock = cliente.socket;
+    if (!sock || sock === visto) return;
+    visto = sock;
+    sock.ev.on("connection.update", (cambio) => {
+      if (cambio.qr && BAJO_SUPERVISOR) process.send({ tipo: "qr", qr: cambio.qr });
+    });
+  }, 100);
+  return () => clearInterval(vigia);
+};
+
+log("Conectando con WhatsApp (si aparece un QR, escanéalo desde el celular de la asistente o desde el panel)...");
+const dejarDeVigilarQr = vigilarQr();
 await cliente.connect();
+dejarDeVigilarQr();
 
 // Aviso directo de WhatsApp cuando la otra persona cuelga o rechaza. No depende de los
 // estados del motor de llamadas, que no siempre reporta el fin.

@@ -9,6 +9,7 @@ dependencies = [
     "pipecat-asterisk>=0.1.4,<0.2",
     "python-dotenv>=1.0",
     "ddgs>=9.16.1",
+    "segno>=1.6",
 ]
 
 [project.scripts]

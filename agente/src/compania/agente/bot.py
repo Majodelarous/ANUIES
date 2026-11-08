@@ -70,9 +70,35 @@ def credenciales_aws() -> dict[str, str | None]:
     }
 
 
-def crear_servicio_voz(instrucciones: str, herramientas: list):
-    """Crea el servicio de voz a voz según ``MOTOR_VOZ`` (gemini o nova)."""
-    motor = os.getenv("MOTOR_VOZ", "gemini").lower()
+MOTORES = ("gemini", "openai", "nova")
+
+
+def motor_elegido(repo: Repositorio | None = None) -> str:
+    """El motor elegido en el panel; si no hay elección, ``MOTOR_VOZ`` del .env."""
+    elegido = repo.ajuste("motor_voz") if repo else None
+    if elegido in MOTORES:
+        return elegido
+    return os.getenv("MOTOR_VOZ", "gemini").lower()
+
+
+def falta_para_motor(motor: str) -> str | None:
+    """Qué falta en el .env para usar ``motor``, o None si está listo."""
+    if motor == "gemini":
+        return None if os.getenv("GOOGLE_API_KEY") else "Falta GOOGLE_API_KEY en .env"
+    if motor == "openai":
+        return None if os.getenv("OPENAI_API_KEY") else "Falta OPENAI_API_KEY en .env"
+    if motor == "nova":
+        try:
+            credenciales_aws()
+        except Exception as error:  # noqa: BLE001
+            return f"Faltan credenciales de AWS: {error}"
+        return None
+    return f"El motor {motor!r} no existe; usa gemini, openai o nova"
+
+
+def crear_servicio_voz(instrucciones: str, herramientas: list, motor: str | None = None):
+    """Crea el servicio de voz a voz: ``motor`` o, si falta, ``MOTOR_VOZ`` (gemini, openai o nova)."""
+    motor = (motor or os.getenv("MOTOR_VOZ", "gemini")).lower()
 
     if motor == "openai":
         from pipecat.services.openai.realtime import events
@@ -181,7 +207,7 @@ async def run_bot(
     """
     repo = Repositorio(os.getenv("RUTA_DB", "compania.db"))
     persona_id = os.getenv("PERSONA_ID")
-    persona = repo.obtener_persona(int(persona_id)) if persona_id else repo.primera_persona()
+    persona = repo.obtener_persona(int(persona_id)) if persona_id else repo.persona_activa()
     if persona is None or persona.id is None:
         raise RuntimeError("No hay persona registrada. Ejecuta: uv run compania-semilla --help")
 
@@ -209,17 +235,16 @@ async def run_bot(
         motivo=recordatorio,
         grabadora=grabadora,
     )
-    llm = crear_servicio_voz(instrucciones, sesion.esquemas())
-    logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal}")
+    motor = motor_elegido(repo)
+    llm = crear_servicio_voz(instrucciones, sesion.esquemas(), motor)
+    logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal} (motor {motor})")
 
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
             # OpenAI detecta los turnos en su servidor; sumar la detección local los duplicaría
-            vad_analyzer=None
-            if os.getenv("MOTOR_VOZ", "gemini").lower() == "openai"
-            else SileroVADAnalyzer(),
+            vad_analyzer=None if motor == "openai" else SileroVADAnalyzer(),
             # Silencia el micrófono mientras corre una herramienta, por ejemplo una nota de voz
             user_mute_strategies=[FunctionCallUserMuteStrategy()],
         ),

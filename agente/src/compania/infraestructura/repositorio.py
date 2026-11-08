@@ -108,6 +108,10 @@ CREATE TABLE IF NOT EXISTS ejecuciones (
     clave TEXT PRIMARY KEY,
     creado TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ajustes (
+    clave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS resultados_juego (
     id INTEGER PRIMARY KEY,
     persona_id INTEGER NOT NULL REFERENCES personas(id),
@@ -197,6 +201,26 @@ class Repositorio:
     def primera_persona(self) -> Persona | None:
         fila = self._db.execute("SELECT id FROM personas ORDER BY id LIMIT 1").fetchone()
         return self.obtener_persona(fila["id"]) if fila else None
+
+    def persona_activa(self) -> Persona | None:
+        """La persona elegida en el panel; si no hay elección, la primera registrada."""
+        elegida = self.ajuste("persona_activa")
+        if elegida and elegida.isdigit() and (persona := self.obtener_persona(int(elegida))):
+            return persona
+        return self.primera_persona()
+
+    # Ajustes que cambia el panel y leen los demás servicios (comparten la base)
+
+    def ajuste(self, clave: str) -> str | None:
+        fila = self._db.execute("SELECT valor FROM ajustes WHERE clave = ?", (clave,)).fetchone()
+        return fila["valor"] if fila else None
+
+    def guardar_ajuste(self, clave: str, valor: str) -> None:
+        self._db.execute(
+            "INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+            (clave, valor),
+        )
+        self._db.commit()
 
     # Recuerdos
 

@@ -11,6 +11,8 @@
   --estable: #1f5f5b;
   --atencion: #8a5a00;
   --alerta: #9b2c2c;
+  --seleccion: #e6f0ef;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --familia: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --e1: 8px;
   --e2: 16px;
@@ -31,13 +33,14 @@ body {
   background: var(--fondo);
 }
 
-h1, h2 { font-weight: 800; margin: 0 0 var(--e3); line-height: 1.12; }
+h1, h2, h3 { font-weight: 800; margin: 0 0 var(--e3); line-height: 1.12; }
 h1 { font-size: clamp(30px, 4vw, 48px); letter-spacing: -0.02em; }
 h2 { font-size: clamp(22px, 2.6vw, 30px); font-weight: 700; }
+h3 { font-size: 19px; font-weight: 700; margin-bottom: var(--e2); }
 p { margin: 0 0 var(--e1); max-width: 65ch; }
 
 .contenido { max-width: var(--ancho); margin: 0 auto; padding: 0 var(--e3); }
-section { padding: var(--e5) 0; border-top: 1px solid var(--linea); }
+section { padding: var(--e5) 0; border-top: 1px solid var(--linea); scroll-margin-top: 60px; }
 .banda { background: var(--banda); }
 
 .barra { position: sticky; top: 0; background: var(--fondo); border-bottom: 1px solid var(--linea); z-index: 1; }
@@ -84,10 +87,10 @@ td { padding: var(--e1); border-bottom: 1px solid var(--linea); }
 
 .rejilla { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e4); }
 
-form { display: grid; gap: var(--e2); max-width: 420px; }
+form { display: grid; gap: var(--e2); max-width: 420px; align-content: start; align-self: start; }
 label { display: grid; gap: 4px; font-weight: 700; font-size: 15px; }
-input, textarea { font: inherit; font-weight: 400; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 2px; background: var(--fondo); color: var(--tinta); }
-input:focus, textarea:focus, button:focus { outline: 3px solid var(--acento); outline-offset: 2px; }
+input, textarea, select { font: inherit; font-weight: 400; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 2px; background: var(--fondo); color: var(--tinta); }
+input:focus, textarea:focus, select:focus, button:focus, a:focus { outline: 3px solid var(--acento); outline-offset: 2px; }
 button { font: inherit; font-weight: 700; min-height: 44px; padding: 0 var(--e3); border: 0; border-radius: 2px; background: var(--marca); color: var(--fondo); cursor: pointer; justify-self: start; }
 button:hover { background: var(--marca-osc); }
 
@@ -129,4 +132,63 @@ button.secundario {
   background: transparent;
   color: var(--marca);
   border: 1px solid var(--linea);
+}
+
+/* Navegación */
+.barra nav { display: flex; gap: var(--e3); }
+.barra nav a { color: var(--tinta-2); text-decoration: none; font-weight: 700; padding: 18px 0; border-bottom: 2px solid transparent; }
+.barra nav a[aria-current="page"] { color: var(--marca); border-bottom-color: var(--marca); }
+a { color: var(--marca); }
+code { font-family: var(--mono); font-size: 0.9em; background: var(--banda); padding: 1px 4px; }
+
+/* Control */
+.aviso { position: fixed; z-index: 2; left: var(--e2); right: var(--e2); bottom: var(--e2); max-width: 640px; margin: 0 auto; padding: var(--e2) var(--e3); background: var(--fondo); box-shadow: 0 2px 12px rgba(29, 42, 43, 0.18); border: 1px solid var(--linea); border-left: 4px solid var(--estable); font-weight: 700; }
+.aviso.error { border-left-color: var(--alerta); }
+.estado-vivo { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0; margin: var(--e3) 0 var(--e2); border-top: 1px solid var(--linea); }
+.estado-vivo div { padding: var(--e2) var(--e2) var(--e2) 0; border-bottom: 1px solid var(--linea); }
+.estado-vivo dt { font-size: 14px; color: var(--gris); }
+.estado-vivo dd { margin: 4px 0 0; font-weight: 800; font-size: 18px; }
+.estado-vivo dd[data-valor="Vinculado"]::before, .estado-vivo dd[data-valor="Libre"]::before, .estado-vivo dd[data-valor="Encontrado"]::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: var(--estable); }
+.estado-vivo dd[data-valor="Puente apagado"]::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; background: var(--alerta); }
+.nota { color: var(--gris); font-size: 14.5px; font-weight: 400; }
+form .nota { display: block; }
+button.grande { min-height: 56px; font-size: 19px; }
+button.activo { background: var(--marca); color: var(--fondo); }
+button.peligro { background: var(--alerta); }
+button.peligro:hover { background: var(--tinta); }
+button:disabled { background: var(--linea); color: var(--gris); cursor: not-allowed; }
+button.secundario { min-height: 40px; }
+button.secundario:hover { background: var(--seleccion); }
+.alterna { display: flex; flex-wrap: wrap; gap: 0; }
+.alterna form.en-fila { display: block; margin: 0 -1px 0 0; }
+.alterna button { border: 1px solid var(--marca); }
+.alterna button.secundario { padding: 0 var(--e3); min-height: 44px; }
+.alterna .nota { display: block; max-width: 220px; margin-top: 4px; }
+label.casilla { display: flex; gap: var(--e1); align-items: center; font-weight: 400; }
+label.casilla input { width: 20px; height: 20px; }
+tr.elegida td { background: var(--seleccion); }
+tr.elegida td:first-child { box-shadow: inset 4px 0 0 var(--marca); }
+.separada { margin-top: var(--e4); }
+[data-qr] img { display: block; border: 1px solid var(--linea); background: #fff; }
+.pasos { padding-left: var(--e3); max-width: 70ch; }
+.pasos > li { padding: var(--e1) 0 var(--e2); }
+.pasos .lista { margin: var(--e1) 0 0; }
+.pasos .lista li { padding: var(--e1) 0; }
+
+@media (max-width: 720px) {
+  .barra .contenido { height: auto; flex-wrap: wrap; padding-top: var(--e1); }
+  .barra nav { gap: var(--e2); width: 100%; order: 3; overflow-x: auto; }
+  .barra nav a { padding: 10px 0; white-space: nowrap; }
+  .alterna { display: grid; }
+  .alterna form.en-fila { margin: 0 0 -1px 0; }
+  .alterna .nota { max-width: none; }
+  table td:nth-child(3), table th:nth-child(3) { display: none; }
+}
+
+@media (max-width: 720px) {
+  table.simple th, table.simple td { display: table-cell !important; }
+}
+
+@media (max-width: 720px) {
+  form.en-linea button { width: auto; }
 }

@@ -16,6 +16,8 @@ x-agente: &agente
   build: ./agente
   env_file: ["${ROUS_ENV:-agente/.env}"]
   environment: &agente-env
+    # Los horarios y recordatorios se guardan en hora local; sin esto los contenedores usan UTC
+    TZ: ${ROUS_TZ:-America/Mexico_City}
     WHATSAPP_PUENTE_HOST: puente
     RUTA_DB: /datos/compania.db
     CARPETA_AUDIOS: /datos/audios
@@ -36,6 +38,7 @@ services:
     build: ./whatsapp
     env_file: ["${ROUS_ENV:-agente/.env}"]
     environment:
+      TZ: ${ROUS_TZ:-America/Mexico_City}
       WHATSAPP_BOT_HOST: bot
       WHATSAPP_PUENTE_ESCUCHA: 0.0.0.0
       WA_AUTH_DIR: /auth

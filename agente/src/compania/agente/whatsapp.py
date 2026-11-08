@@ -106,7 +106,7 @@ def crear_app(repo=None, carpeta_audios: str | Path | None = None, imagenes=None
     def persona_actual():
         persona_id = os.getenv("PERSONA_ID")
         persona = (
-            repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.primera_persona()
+            repositorio.obtener_persona(int(persona_id)) if persona_id else repositorio.persona_activa()
         )
         if persona is None or persona.id is None:
             raise HTTPException(404, "No hay persona registrada")
