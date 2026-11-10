@@ -229,3 +229,14 @@ def test_voces_por_motor(cliente, repo, monkeypatch):
     assert "tipo=error" in r.headers["location"]
     assert configuracion.voz(repo, "openai") == "cedar"
     assert '<option value="cedar" selected>cedar</option>' in cliente.get("/control").text
+
+
+def test_numero_de_10_digitos_lleva_52(cliente, repo, puente, persona):
+    from compania.agente.programador import numero_de
+
+    cliente.post(f"/control/personas/{persona.id}", data={"telefono": "222 010 3377"})
+    assert repo.obtener_persona(persona.id).telefono == "522220103377"
+    cliente.post("/control/llamar", data={"numero": "2225550000"})
+    assert puente.llamadas[-1] == "522225550000"
+    persona.telefono = "2225551111"  # guardado antes de este cambio
+    assert numero_de(persona) == "522225551111"

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Protocol
@@ -22,7 +21,7 @@ from loguru import logger
 
 from compania.dominio.modelos import Alerta, NivelAlerta, Persona
 from compania.dominio.programacion import Tarea, tareas_pendientes
-from compania.infraestructura.configuracion import nombre_asistente
+from compania.infraestructura.configuracion import con_lada, nombre_asistente
 from compania.infraestructura.puente_whatsapp import AvisoFamilia, PuenteLlamadas, aviso_desde_entorno
 from compania.infraestructura.repositorio import Repositorio
 
@@ -40,9 +39,7 @@ class Llamadas(Protocol):
 
 
 def numero_de(persona: Persona) -> str | None:
-    numero = persona.telefono or os.getenv("WHATSAPP_PERSONA") or ""
-    numero = re.sub(r"\D", "", numero)
-    return numero or None
+    return con_lada(persona.telefono or os.getenv("WHATSAPP_PERSONA")) or None
 
 
 def texto_sin_respuesta(tarea: Tarea, trato: str, nombre: str) -> str:

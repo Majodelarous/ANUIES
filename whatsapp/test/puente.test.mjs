@@ -19,6 +19,7 @@ test("satura valores fuera de rango", () => {
 
 test("normaliza y valida números", () => {
   assert.equal(normalizarNumero("+52 222 123 4567"), "522221234567");
+  assert.equal(normalizarNumero("222 123 4567"), "522221234567");
   assert.throws(() => normalizarNumero("12345"));
   assert.equal(numeroDeJid("5212221234567:3@s.whatsapp.net"), "5212221234567");
 });

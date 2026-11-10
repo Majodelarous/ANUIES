@@ -24,7 +24,9 @@ export const pcm16AFloat = (bytes) => {
 
 /** Deja solo dígitos y valida longitud con código de país (10 a 15). */
 export const normalizarNumero = (texto) => {
-  const digitos = String(texto ?? "").replace(/\D/g, "");
+  let digitos = String(texto ?? "").replace(/\D/g, "");
+  // 10 dígitos es un número de México sin lada de país: se agrega el 52
+  if (digitos.length === 10) digitos = `52${digitos}`;
   if (!/^\d{10,15}$/.test(digitos)) {
     throw new Error("Usa el número con código de país, por ejemplo 522221234567");
   }

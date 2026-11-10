@@ -54,11 +54,16 @@ def nombre_asistente(repo: Repositorio | None = None) -> str:
     return valor(repo, "nombre_asistente") or "Rous"
 
 
+def con_lada(texto: str | None) -> str:
+    """Solo dígitos; un número de 10 dígitos es de México y se le agrega el 52."""
+    digitos = re.sub(r"\D", "", texto or "")
+    return f"52{digitos}" if len(digitos) == 10 else digitos
+
+
 def numero_de_la_persona(repo: Repositorio | None = None) -> str:
     """WhatsApp de la persona activa; si no tiene, WHATSAPP_PERSONA del .env."""
     persona = repo.persona_activa() if repo else None
-    numero = (persona.telefono if persona else None) or os.getenv("WHATSAPP_PERSONA") or ""
-    return re.sub(r"\D", "", numero)
+    return con_lada((persona.telefono if persona else None) or os.getenv("WHATSAPP_PERSONA"))
 
 
 def para_el_puente(repo: Repositorio) -> dict:

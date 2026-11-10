@@ -41,7 +41,8 @@ NUMERO = re.compile(r"^\d{10,15}$")
 
 
 def solo_digitos(texto: str) -> str:
-    return re.sub(r"\D", "", texto or "")
+    """Teléfono en dígitos; con 10 dígitos se agrega el 52 de México."""
+    return configuracion.con_lada(texto)
 
 
 def numero_de_la_persona(persona: Persona | None) -> str:
