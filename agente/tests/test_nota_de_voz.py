@@ -5,10 +5,6 @@ from compania.agente.herramientas import Sesion
 
 class GrabadoraFalsa:
     frecuencia = 16000
-    paradas = 0
-
-    async def esperar_fin_de_audio(self, desde, max_s=20.0):
-        return None
 
     def __init__(self, resultado):
         self.resultado = resultado

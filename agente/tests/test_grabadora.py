@@ -76,35 +76,3 @@ def test_sin_grabar_no_guarda_nada():
     g = Grabadora()
     g.observar(InputAudioRawFrame(voz(), F, 1))  # no truena ni guarda
     assert g._detector is None
-
-
-async def test_espera_a_que_termine_de_sonar_el_audio_en_cola():
-    import asyncio
-
-    from pipecat.frames.frames import BotStartedSpeakingFrame, BotStoppedSpeakingFrame
-    from pipecat.processors.frame_processor import FrameDirection
-
-    g = Grabadora()
-    antes = g.paradas
-
-    async def la_salida_termina_despues():
-        await asyncio.sleep(0.1)
-        await g.process_frame(BotStartedSpeakingFrame(), FrameDirection.UPSTREAM)
-        await asyncio.sleep(0.2)
-        await g.process_frame(BotStoppedSpeakingFrame(), FrameDirection.UPSTREAM)
-
-    inicio = asyncio.get_running_loop().time()
-    tarea = asyncio.create_task(la_salida_termina_despues())
-    await g.esperar_fin_de_audio(antes, max_s=2)
-    assert asyncio.get_running_loop().time() - inicio >= 0.3
-    assert not g.bot_hablando and g.paradas == antes + 1
-    await tarea
-
-
-async def test_no_se_queda_esperando_para_siempre():
-    import asyncio
-
-    g = Grabadora()
-    inicio = asyncio.get_running_loop().time()
-    await g.esperar_fin_de_audio(g.paradas, max_s=0.2)
-    assert asyncio.get_running_loop().time() - inicio < 1

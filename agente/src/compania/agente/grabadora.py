@@ -19,7 +19,7 @@ import os
 import wave
 from dataclasses import dataclass, field
 
-from pipecat.frames.frames import BotStartedSpeakingFrame, BotStoppedSpeakingFrame, Frame, InputAudioRawFrame
+from pipecat.frames.frames import Frame, InputAudioRawFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 
@@ -103,23 +103,6 @@ class Grabadora(FrameProcessor):
         self._detector: DetectorDeFin | None = None
         self._listo: asyncio.Future | None = None
         self.frecuencia = 16000
-        # Lo que dice la salida de audio (llega de regreso por el pipeline): si Rous sigue
-        # hablando y cuántas veces ha terminado de hablar
-        self.bot_hablando = False
-        self.paradas = 0
-
-    async def esperar_fin_de_audio(self, desde: int, max_s: float = 20.0) -> None:
-        """Espera a que termine de sonar todo lo que ya se mandó a la llamada.
-
-        ``desde`` es ``paradas`` antes de mandar el último audio (por ejemplo el tonito): se espera
-        a que la salida se detenga al menos una vez más. Con OpenAI y Nova el modelo pide la nota
-        mientras su audio todavía está en la cola, así que el tonito suena después de ese audio.
-        """
-        limite = asyncio.get_running_loop().time() + max_s
-        while asyncio.get_running_loop().time() < limite:
-            if self.paradas > desde and not self.bot_hablando:
-                return
-            await asyncio.sleep(0.05)
 
     async def grabar(self) -> tuple[bytes, int] | None:
         """Graba hasta que la persona termina. Devuelve (wav, frecuencia) o None si no habló."""
@@ -144,10 +127,5 @@ class Grabadora(FrameProcessor):
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
-        if isinstance(frame, BotStartedSpeakingFrame):
-            self.bot_hablando = True
-        elif isinstance(frame, BotStoppedSpeakingFrame):
-            self.bot_hablando = False
-            self.paradas += 1
         self.observar(frame)
         await self.push_frame(frame, direction)
