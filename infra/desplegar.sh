@@ -31,11 +31,11 @@ scp -q "$TEMPORAL" "$DESTINO:/opt/rous/agente/.env"
 "${SSH[@]}" "printf 'COMPOSE_FILE=docker-compose.yml:docker-compose.nube.yml\nROUS_DOMINIO=%s\n' '$DOMINIO' > /opt/rous/.env"
 "${SSH[@]}" 'chmod 600 /opt/rous/agente/.env && cd /opt/rous && git pull --ff-only && docker compose up -d --build --remove-orphans && docker compose ps'
 
-if [ "$(dig +short "$DOMINIO" 2>/dev/null | tail -1)" != "$IP" ]; then
+if [ "$(dig +short "$DOMINIO" 2>/dev/null | sort -u | tr -d '\n')" != "$IP" ]; then
   echo
-  echo "Ojo: $DOMINIO todavía no apunta a $IP. En Cloudflare:"
-  echo "  $(terraform output -raw cloudflare)"
-  echo "Caddy saca el certificado solo en cuanto el registro exista."
+  echo "Ojo: $DOMINIO todavía no responde solo con $IP: $(dig +short "$DOMINIO" | tr '\n' ' ')"
+  echo "Terraform maneja el registro; si hay otro registro de $DOMINIO en Cloudflare, bórralo."
+  echo "Caddy saca el certificado solo en cuanto el nombre apunte nada más a $IP."
 fi
 echo
 echo "Listo: $(terraform output -raw panel)"

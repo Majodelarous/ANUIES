@@ -12,11 +12,6 @@ output "panel" {
   value       = "https://${var.dominio}/control"
 }
 
-output "cloudflare" {
-  description = "Registro que hay que crear en Cloudflare antes de desplegar."
-  value       = "Tipo A, nombre ${split(".", var.dominio)[0]}, contenido ${aws_eip.rous.public_ip}, proxy desactivado (solo DNS, nube gris), TTL automático"
-}
-
 output "instancia" {
   value = aws_instance.rous.id
 }

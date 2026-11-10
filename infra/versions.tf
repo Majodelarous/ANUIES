@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.26"
+    }
   }
 }
 
@@ -20,3 +24,7 @@ provider "aws" {
     }
   }
 }
+
+# El token se lee de la variable de entorno CLOUDFLARE_API_TOKEN (permiso: Zona, DNS, Editar,
+# solo para la zona del dominio). No va en archivos del repositorio.
+provider "cloudflare" {}

@@ -57,9 +57,15 @@ variable "rama" {
 }
 
 variable "dominio" {
-  description = "Dominio del panel. En Cloudflare: registro A hacia la IP fija, sin proxy (nube gris)."
+  description = "Dominio del panel. Terraform crea el registro A en Cloudflare hacia la IP fija."
   type        = string
   default     = "rous.foor.dev"
+}
+
+variable "zona_cloudflare" {
+  description = "Zona de Cloudflare donde vive el dominio."
+  type        = string
+  default     = "foor.dev"
 }
 
 variable "permitir_nova" {
