@@ -488,14 +488,30 @@ const borrarSesion = async () => {
 
 // La librería solo dibuja el QR en la terminal. Se escucha el mismo evento en cada socket que
 // crea (reintenta si falla) y se manda al supervisor, que lo sirve al panel en /qr.
+// Baileys da al primer QR 60 s y a los siguientes 20 s; tras unos 6 deja de mandar sin cerrar la
+// conexión y el puente se quedaría con un QR vencido. Cada QR viaja al supervisor con su
+// vencimiento, y si vence sin uno nuevo el puente se reinicia (el supervisor lo levanta en medio
+// segundo) para que siempre haya uno vigente.
+const QR_PRIMERO_MS = 60_000;
+const QR_SIGUIENTE_MS = 20_000;
+const QR_MARGEN_MS = 5_000;
 const vigilarQr = () => {
   let visto = null;
+  let cuantos = 0;
+  let vence = 0;
   const vigia = setInterval(() => {
+    if (vence && Date.now() > vence + QR_MARGEN_MS) {
+      log("Los QR se agotaron sin que se escaneara ninguno; se reinicia para mostrar uno nuevo");
+      process.exit(0);
+    }
     const sock = cliente.socket;
     if (!sock || sock === visto) return;
     visto = sock;
     sock.ev.on("connection.update", (cambio) => {
-      if (cambio.qr && BAJO_SUPERVISOR) process.send({ tipo: "qr", qr: cambio.qr });
+      if (!cambio.qr) return;
+      cuantos += 1;
+      vence = Date.now() + (cuantos === 1 ? QR_PRIMERO_MS : QR_SIGUIENTE_MS);
+      if (BAJO_SUPERVISOR) process.send({ tipo: "qr", qr: cambio.qr, vence });
     });
   }, 100);
   return () => clearInterval(vigia);

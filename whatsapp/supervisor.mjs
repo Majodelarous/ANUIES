@@ -40,6 +40,8 @@ let reintentoPendiente = null;
 let ultima = null;
 // QR para vincular el celular de la asistente, mientras el puente espera que lo escaneen
 let qrActual = null;
+// Hasta cuándo sirve el QR (lo calcula el puente: 60 s el primero, 20 s los siguientes)
+let qrVence = 0;
 
 const levantar = () => {
   const inicio = Date.now();
@@ -52,6 +54,7 @@ const levantar = () => {
   puente.on("message", (m) => {
     if (m?.tipo === "qr") {
       qrActual = m.qr;
+      qrVence = Number(m.vence) || Date.now() + 20_000;
     } else if (m?.tipo === "listo") {
       qrActual = null;
       caidasSeguidas = 0;
@@ -114,7 +117,8 @@ const servidor = createServer(async (req, res) => {
     res.end(texto);
   };
   if (req.method === "GET" && req.url === "/qr") {
-    return responder(200, JSON.stringify({ qr: qrActual, conectado: compuerta.abierta }));
+    const vigente = qrActual && Date.now() < qrVence ? qrActual : null;
+    return responder(200, JSON.stringify({ qr: vigente, conectado: compuerta.abierta }));
   }
   if (req.method === "POST" && req.url === "/reiniciar" && !compuerta.abierta) {
     return responder(200, JSON.stringify({ mensaje: "WhatsApp se está conectando; tomará la configuración nueva al terminar." }));
