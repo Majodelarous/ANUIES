@@ -91,8 +91,12 @@ class Sesion:
         grabadora: Grabadora | None = None,
         imagenes: ImagenesParecidas | None = None,
         reloj: Callable[[], datetime] = datetime.now,
+        esperar_fin_del_audio: bool = False,
     ) -> None:
         self.repo = repo
+        # Nova y OpenAI piden la nota de voz con su audio todavía en la cola: el tonito y la
+        # grabación esperan a que termine. Con Gemini se queda el flujo original (probado).
+        self.esperar_fin_del_audio = esperar_fin_del_audio
         self.persona_id = persona_id
         self.reloj = reloj
         persona = repo.obtener_persona(persona_id)
@@ -371,8 +375,15 @@ class Sesion:
             )
             return
         frecuencia = self.grabadora.frecuencia
-        await params.llm.push_frame(OutputAudioRawFrame(tono(frecuencia), frecuencia, 1))
-        await asyncio.sleep(0.5)
+        if self.esperar_fin_del_audio:
+            antes = self.grabadora.paradas
+            await params.llm.push_frame(OutputAudioRawFrame(tono(frecuencia), frecuencia, 1))
+            espera = await self.grabadora.esperar_fin_de_audio(antes)
+            logger.info(f"Nota de voz: el tonito terminó de sonar tras {espera:.1f} s; empieza a grabar")
+            await asyncio.sleep(0.2)
+        else:
+            await params.llm.push_frame(OutputAudioRawFrame(tono(frecuencia), frecuencia, 1))
+            await asyncio.sleep(0.5)
         grabado = await self.grabadora.grabar()
         if grabado is None:
             await params.result_callback(

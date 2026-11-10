@@ -129,6 +129,9 @@ def crear_servicio_voz(
 
         ajustes_nova = AWSNovaSonicLLMService.Settings(system_instruction=instrucciones)
         ajustes_nova.voice = voz or os.getenv("NOVA_VOICE_ID") or "lupe"
+        # Qué tan rápido decide que la persona terminó de hablar: LOW, MEDIUM o HIGH (vacío: el del modelo)
+        if sensibilidad := os.getenv("NOVA_SENSIBILIDAD", "").upper():
+            ajustes_nova.endpointing_sensitivity = sensibilidad
         credenciales = credenciales_aws()
         return AWSNovaSonicLLMService(
             access_key_id=credenciales["access_key_id"],
@@ -235,6 +238,7 @@ async def run_bot(
         nombre=nombre_asistente(repo),
     )
     grabadora = Grabadora()
+    motor = motor_elegido(repo)
     sesion = Sesion(
         repo,
         persona.id,
@@ -242,8 +246,8 @@ async def run_bot(
         trato=persona.trato,
         motivo=recordatorio,
         grabadora=grabadora,
+        esperar_fin_del_audio=motor != "gemini",
     )
-    motor = motor_elegido(repo)
     llm = crear_servicio_voz(instrucciones, sesion.esquemas(), motor, configuracion.voz(repo, motor))
     logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal} (motor {motor})")
 
