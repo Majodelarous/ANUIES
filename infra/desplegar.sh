@@ -21,10 +21,11 @@ SSH=(ssh -o StrictHostKeyChecking=accept-new "$DESTINO")
 echo "Esperando a que el servidor termine de instalar Docker (la primera vez tarda unos minutos)..."
 until "${SSH[@]}" test -f /var/lib/cloud/instance/rous-listo 2>/dev/null; do sleep 10; done
 
-# AWS_PROFILE no existe en el servidor: Nova usa el rol de la instancia
+# AWS_PROFILE no existe en el servidor (Nova usa el rol de la instancia) y el token de
+# Cloudflare solo lo usa Terraform en tu computadora: ninguno de los dos se sube
 TEMPORAL="$(mktemp)"
 trap 'rm -f "$TEMPORAL"' EXIT
-grep -v '^AWS_PROFILE=' "$ENV_LOCAL" > "$TEMPORAL"
+grep -v -E '^(AWS_PROFILE|CLOUDFLARE_[A-Z_]*)=' "$ENV_LOCAL" > "$TEMPORAL"
 scp -q "$TEMPORAL" "$DESTINO:/opt/rous/agente/.env"
 
 # En el servidor, docker compose usa también docker-compose.nube.yml (Caddy) y el dominio
