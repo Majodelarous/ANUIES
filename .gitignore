@@ -22,3 +22,6 @@ infra/*.tfstate.*
 infra/terraform.tfvars
 infra/backend.tf
 infra/.terraform.tfstate.lock.info
+
+# Caché local de la CLI de Cloudflare (trae datos de la cuenta)
+.cloudflare/
