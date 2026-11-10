@@ -33,12 +33,29 @@ def test_energia():
 
 def test_termina_tras_silencio_despues_de_hablar():
     d = DetectorDeFin()
+    assert not alimentar(d, [silencio()] * 50)  # 1 s mientras llega el tonito (se ignora)
     assert not alimentar(d, [voz()] * 50)  # 1 s hablando
     assert alimentar(d, [silencio()] * 100)  # 2 s de silencio: termina
     audio = d.audio()
     assert audio is not None
     # Se quita el silencio final salvo medio segundo
     assert abs(len(audio) / 2 / F - 1.5) < 0.15
+
+
+def test_el_eco_del_tonito_no_queda_en_la_nota():
+    d = DetectorDeFin()
+    # Medio segundo de silencio y el eco del tonito, como llega en la llamada; luego la voz
+    alimentar(d, [silencio()] * 25 + [voz()] * 25)
+    assert not d.hablo and d.partes == []
+    assert not alimentar(d, [voz()] * 50)
+    alimentar(d, [silencio()] * 100)
+    assert abs(len(d.audio()) / 2 / F - 1.5) < 0.15  # solo la voz y medio segundo final
+
+
+def test_el_eco_solo_no_cuenta_como_que_hablo():
+    d = DetectorDeFin(sin_voz_s=3.0)
+    assert alimentar(d, [voz()] * 50 + [silencio()] * 150)
+    assert d.audio() is None
 
 
 def test_si_no_habla_se_rinde_sin_audio():
@@ -61,7 +78,7 @@ async def test_grabadora_graba_hasta_que_se_calla():
 
     async def hablar():
         await asyncio.sleep(0.01)
-        for b in [voz()] * 25 + [silencio()] * 100:
+        for b in [silencio()] * 50 + [voz()] * 25 + [silencio()] * 100:
             g.observar(InputAudioRawFrame(b, F, 1))
 
     tarea = asyncio.create_task(hablar())

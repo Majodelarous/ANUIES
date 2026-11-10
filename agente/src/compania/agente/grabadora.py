@@ -4,6 +4,8 @@
 pasar todo y, cuando se le pide, guarda el audio de la persona hasta que se queda callada.
 
 ``DetectorDeFin`` decide cuándo terminó de hablar con la energía del audio (sin modelos):
+- ignora el primer ``ignorar_s``: es el tiempo que tarda el tonito en llegar al teléfono y su eco
+  en el micrófono, que se oía al principio de la nota;
 - termina tras ``silencio_fin_s`` de silencio después de haber hablado;
 - se rinde si en ``sin_voz_s`` no habló nada;
 - corta en ``max_s`` como máximo.
@@ -37,15 +39,20 @@ class DetectorDeFin:
     silencio_fin_s: float = 1.6
     sin_voz_s: float = 6.0
     max_s: float = 25.0
+    ignorar_s: float = 1.0
     transcurrido: float = 0.0
+    grabado: float = 0.0
     hablo: bool = False
     silencio: float = 0.0
     partes: list[bytes] = field(default_factory=list)
 
     def agregar(self, pcm: bytes, segundos: float) -> bool:
         """Agrega un bloque de audio. Devuelve True cuando la grabación terminó."""
-        self.partes.append(pcm)
         self.transcurrido += segundos
+        if self.transcurrido <= self.ignorar_s + 1e-6:  # margen por la suma de flotantes
+            return False
+        self.partes.append(pcm)
+        self.grabado += segundos
         if energia(pcm) >= self.umbral:
             self.hablo = True
             self.silencio = 0.0
@@ -64,7 +71,7 @@ class DetectorDeFin:
         datos = b"".join(self.partes)
         if self.partes and self.silencio > 0:
             # Quitar el silencio final, dejando medio segundo para que no suene cortado
-            por_segundo = len(datos) / self.transcurrido if self.transcurrido else 0
+            por_segundo = len(datos) / self.grabado if self.grabado else 0
             sobra = max(0.0, self.silencio - 0.5)
             corte = int(por_segundo * sobra) // 2 * 2
             if 0 < corte < len(datos):
@@ -125,7 +132,10 @@ class Grabadora(FrameProcessor):
 
     async def grabar(self) -> tuple[bytes, int] | None:
         """Graba hasta que la persona termina. Devuelve (wav, frecuencia) o None si no habló."""
-        self._detector = DetectorDeFin(umbral=float(os.getenv("GRABADORA_UMBRAL", "500")))
+        self._detector = DetectorDeFin(
+            umbral=float(os.getenv("GRABADORA_UMBRAL", "500")),
+            ignorar_s=float(os.getenv("GRABADORA_IGNORAR_S", "1.0")),
+        )
         self._listo = asyncio.get_running_loop().create_future()
         try:
             await asyncio.wait_for(self._listo, timeout=self._detector.max_s + 5)
