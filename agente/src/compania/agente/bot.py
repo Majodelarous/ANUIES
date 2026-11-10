@@ -74,6 +74,13 @@ def credenciales_aws() -> dict[str, str | None]:
 
 MOTORES = ("gemini", "openai", "nova")
 
+# OpenAI tiende a sonar con acento extranjero y a pedir confirmaciones de más si no se le indica
+EXTRA_OPENAI = (
+    "Habla siempre en español de México, con acento mexicano natural, como una persona de la Ciudad "
+    "de México o de Puebla; nunca uses acento ni palabras en inglés. Responde breve y con calidez. "
+    "No pidas que confirme lo que ya dijo claro: confirma solo antes de enviar algo a la familia.\n\n"
+)
+
 
 def motor_elegido(repo: Repositorio | None = None) -> str:
     """El motor elegido en el panel; si no hay elección, ``MOTOR_VOZ`` del .env."""
@@ -113,11 +120,23 @@ def crear_servicio_voz(
 
         ajustes_openai = OpenAIRealtimeLLMService.Settings(
             model=os.getenv("OPENAI_MODEL") or "gpt-realtime-2.1",
-            system_instruction=instrucciones,
+            system_instruction=EXTRA_OPENAI + instrucciones,
             session_properties=events.SessionProperties(
                 audio=events.AudioConfiguration(
-                    output=events.AudioOutput(voice=voz or os.getenv("OPENAI_VOICE") or "marin")
-                )
+                    input=events.AudioInput(
+                        # La transcripción en español ayuda a que entienda y conteste en español
+                        transcription=events.InputAudioTranscription(language="es"),
+                        # Audio de teléfono: micrófono cerca de la boca
+                        noise_reduction=events.InputAudioNoiseReduction(type="near_field"),
+                        # Las personas mayores hacen pausas: un poco más de silencio antes de contestar
+                        turn_detection=events.TurnDetection(
+                            silence_duration_ms=int(os.getenv("OPENAI_SILENCIO_MS", "700"))
+                        ),
+                    ),
+                    output=events.AudioOutput(voice=voz or os.getenv("OPENAI_VOICE") or "marin"),
+                ),
+                # Razonar menos contesta más rápido; para platicar basta
+                reasoning=events.Reasoning(effort=os.getenv("OPENAI_RAZONAMIENTO", "low")),
             ),
         )
         return OpenAIRealtimeLLMService(

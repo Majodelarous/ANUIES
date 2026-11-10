@@ -371,8 +371,11 @@ class Sesion:
             )
             return
         frecuencia = self.grabadora.frecuencia
+        antes = self.grabadora.paradas
         await params.llm.push_frame(OutputAudioRawFrame(tono(frecuencia), frecuencia, 1))
-        await asyncio.sleep(0.5)
+        # Se graba hasta que termina de sonar lo que Rous estaba diciendo y el tonito
+        await self.grabadora.esperar_fin_de_audio(antes)
+        await asyncio.sleep(0.2)
         grabado = await self.grabadora.grabar()
         if grabado is None:
             await params.result_callback(
