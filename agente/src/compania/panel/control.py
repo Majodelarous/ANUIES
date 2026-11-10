@@ -207,6 +207,16 @@ def registrar(app: FastAPI, repo: Repositorio, puente: ControlPuente, pagina_bas
             repo.guardar_ajuste(clave, texto)
         return volver("configuracion", "Configuración guardada." + aplicar_en_whatsapp())
 
+    @app.post("/control/voces")
+    def guardar_voces(voz_gemini: str = Form(""), voz_openai: str = Form(""), voz_nova: str = Form("")):
+        elegidas = {"voz_gemini": voz_gemini, "voz_openai": voz_openai, "voz_nova": voz_nova}
+        for clave, voz in elegidas.items():
+            if voz and voz not in configuracion.VOCES[clave]:
+                return volver("motor", f"La voz {voz!r} no está en la lista.", False)
+        for clave, voz in elegidas.items():
+            repo.guardar_ajuste(clave, voz)
+        return volver("motor", "Voces guardadas: aplican desde la siguiente llamada.")
+
     @app.post("/control/recordatorio")
     def recordatorio(texto: str = Form(...), minutos: int = Form(...)):
         persona = repo.persona_activa()
@@ -317,6 +327,16 @@ def cuerpo_control(repo: Repositorio, aviso: str, tipo: str) -> str:
         f'<span class="nota">Ahora: {e(configuracion.valor(repo, clave) or "sin definir")}'
         f" (de {configuracion.origen(repo, clave)})</span></label>"
         for clave, (_, _, etiqueta) in configuracion.AJUSTES.items()
+        if clave not in configuracion.VOCES
+    )
+    selectores_voz = "".join(
+        f'<label>{e(configuracion.AJUSTES[clave][2])}<select name="{clave}">'
+        f'<option value="">Usar la del .env ({e(configuracion.valor(None, clave))})</option>'
+        + "".join(
+            f'<option value="{v}"{" selected" if repo.ajuste(clave) == v else ""}>{v}</option>' for v in voces
+        )
+        + f'</select><span class="nota">Ahora: {e(configuracion.valor(repo, clave))}</span></label>'
+        for clave, voces in configuracion.VOCES.items()
     )
 
     return f"""{aviso_html}
@@ -380,6 +400,11 @@ def cuerpo_control(repo: Repositorio, aviso: str, tipo: str) -> str:
 <h2>Motor de voz</h2>
 <p>El cambio aplica desde la siguiente llamada, sin reiniciar nada. Un motor sin su llave en el .env aparece desactivado.</p>
 <div class="alterna">{botones_motor}</div>
+<form method="post" action="/control/voces" class="separada">
+<h3>Voz de cada motor</h3>
+<p class="nota">Escucha las voces en el sitio de cada proveedor antes de elegir. Aplica desde la siguiente llamada.</p>
+{selectores_voz}
+<button type="submit">Guardar voces</button></form>
 </div></section>
 
 <section class="banda" id="whatsapp"><div class="contenido rejilla">

@@ -34,6 +34,7 @@ from compania.agente.grabadora import Grabadora
 from compania.agente.herramientas import Sesion
 from compania.agente.instrucciones import construir_instrucciones
 from compania.dominio import bienestar
+from compania.infraestructura import configuracion
 from compania.infraestructura.configuracion import nombre_asistente
 from compania.infraestructura.puente_whatsapp import aviso_desde_entorno
 from compania.infraestructura.repositorio import Repositorio
@@ -97,8 +98,13 @@ def falta_para_motor(motor: str) -> str | None:
     return f"El motor {motor!r} no existe; usa gemini, openai o nova"
 
 
-def crear_servicio_voz(instrucciones: str, herramientas: list, motor: str | None = None):
-    """Crea el servicio de voz a voz: ``motor`` o, si falta, ``MOTOR_VOZ`` (gemini, openai o nova)."""
+def crear_servicio_voz(
+    instrucciones: str, herramientas: list, motor: str | None = None, voz: str | None = None
+):
+    """Crea el servicio de voz a voz: ``motor`` o, si falta, ``MOTOR_VOZ`` (gemini, openai o nova).
+
+    ``voz`` es la elegida en el panel; si falta, la del .env.
+    """
     motor = (motor or os.getenv("MOTOR_VOZ", "gemini")).lower()
 
     if motor == "openai":
@@ -110,7 +116,7 @@ def crear_servicio_voz(instrucciones: str, herramientas: list, motor: str | None
             system_instruction=instrucciones,
             session_properties=events.SessionProperties(
                 audio=events.AudioConfiguration(
-                    output=events.AudioOutput(voice=os.getenv("OPENAI_VOICE") or "marin")
+                    output=events.AudioOutput(voice=voz or os.getenv("OPENAI_VOICE") or "marin")
                 )
             ),
         )
@@ -122,7 +128,7 @@ def crear_servicio_voz(instrucciones: str, herramientas: list, motor: str | None
         from pipecat.services.aws.nova_sonic.llm import AWSNovaSonicLLMService
 
         ajustes_nova = AWSNovaSonicLLMService.Settings(system_instruction=instrucciones)
-        ajustes_nova.voice = os.getenv("NOVA_VOICE_ID") or "lupe"
+        ajustes_nova.voice = voz or os.getenv("NOVA_VOICE_ID") or "lupe"
         credenciales = credenciales_aws()
         return AWSNovaSonicLLMService(
             access_key_id=credenciales["access_key_id"],
@@ -136,7 +142,7 @@ def crear_servicio_voz(instrucciones: str, herramientas: list, motor: str | None
     from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, GeminiVADParams
 
     ajustes = GeminiLiveLLMService.Settings(
-        voice=os.getenv("GOOGLE_VOICE_ID", "Aoede"),
+        voice=voz or os.getenv("GOOGLE_VOICE_ID", "Aoede"),
         language=os.getenv("IDIOMA", "es-US"),
         system_instruction=instrucciones,
         vad=GeminiVADParams(silence_duration_ms=int(os.getenv("SILENCIO_MS", "900"))),
@@ -238,7 +244,7 @@ async def run_bot(
         grabadora=grabadora,
     )
     motor = motor_elegido(repo)
-    llm = crear_servicio_voz(instrucciones, sesion.esquemas(), motor)
+    llm = crear_servicio_voz(instrucciones, sesion.esquemas(), motor, configuracion.voz(repo, motor))
     logger.info(f"Llamada {llamada.id} con {persona.trato} por {llamada.canal} (motor {motor})")
 
     context = LLMContext()

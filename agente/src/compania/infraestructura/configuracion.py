@@ -16,7 +16,22 @@ AJUSTES = {
     "whatsapp_grupo": ("WHATSAPP_GRUPO", "", "Nombre del grupo de la familia"),
     "whatsapp_prefijo": ("WHATSAPP_PREFIJO", "abue", "Palabra con la que la familia le habla a la abuelita"),
     "nombre_asistente": ("NOMBRE_ASISTENTE", "Rous", "Nombre de la asistente"),
+    "voz_gemini": ("GOOGLE_VOICE_ID", "Aoede", "Voz con Gemini"),
+    "voz_openai": ("OPENAI_VOICE", "marin", "Voz con OpenAI"),
+    "voz_nova": ("NOVA_VOICE_ID", "lupe", "Voz con Nova"),
 }
+
+# Voces que acepta cada motor (las de Nova son las de español). Una voz fuera de la lista haría
+# fallar la llamada, por eso el panel solo deja elegir de aquí.
+VOCES = {
+    "voz_gemini": ("Aoede", "Kore", "Leda", "Zephyr", "Puck", "Charon", "Fenrir", "Orus"),
+    "voz_openai": ("marin", "cedar", "coral", "shimmer", "sage", "ballad", "alloy", "ash", "echo", "verse"),
+    "voz_nova": ("lupe", "carlos"),
+}
+
+
+def voz(repo: Repositorio | None, motor: str) -> str:
+    return valor(repo, f"voz_{motor}")
 
 
 def valor(repo: Repositorio | None, clave: str) -> str:

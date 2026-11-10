@@ -216,3 +216,16 @@ def test_aviso_usa_el_grupo_del_panel(repo, monkeypatch):
     assert isinstance(aviso_desde_entorno(repo), SinAviso)
     repo.guardar_ajuste("whatsapp_grupo", "Familia López")
     assert isinstance(aviso_desde_entorno(repo), PuenteWhatsApp)
+
+
+def test_voces_por_motor(cliente, repo, monkeypatch):
+    from compania.infraestructura import configuracion
+
+    monkeypatch.delenv("OPENAI_VOICE", raising=False)
+    assert configuracion.voz(repo, "openai") == "marin"
+    cliente.post("/control/voces", data={"voz_openai": "cedar", "voz_gemini": "", "voz_nova": ""})
+    assert configuracion.voz(repo, "openai") == "cedar"
+    r = cliente.post("/control/voces", data={"voz_openai": "inventada"}, follow_redirects=False)
+    assert "tipo=error" in r.headers["location"]
+    assert configuracion.voz(repo, "openai") == "cedar"
+    assert '<option value="cedar" selected>cedar</option>' in cliente.get("/control").text
