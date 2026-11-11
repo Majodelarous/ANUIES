@@ -6,7 +6,7 @@ terraform {
     bucket       = "NOMBRE-DE-TU-BUCKET"
     key          = "rous/ec2.tfstate"
     region       = "us-east-1"
-    profile      = "Fortino-IAM-Admin"
+    profile      = "mi-perfil"
     encrypt      = true
     use_lockfile = true
   }

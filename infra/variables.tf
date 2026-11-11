@@ -7,7 +7,7 @@ variable "region" {
 variable "perfil_aws" {
   description = "Perfil de ~/.aws/config con el que corre Terraform."
   type        = string
-  default     = "Fortino-IAM-Admin"
+  default     = "default"
 }
 
 variable "nombre" {
@@ -59,13 +59,13 @@ variable "rama" {
 variable "dominio" {
   description = "Dominio del panel. Terraform crea el registro A en Cloudflare hacia la IP fija."
   type        = string
-  default     = "rous.foor.dev"
+  default     = "rous.majodelarous.dev"
 }
 
 variable "zona_cloudflare" {
   description = "Zona de Cloudflare donde vive el dominio."
   type        = string
-  default     = "foor.dev"
+  default     = "majodelarous.dev"
 }
 
 variable "permitir_nova" {

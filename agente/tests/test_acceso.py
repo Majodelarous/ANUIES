@@ -31,7 +31,7 @@ def test_hash_sin_signo_de_pesos_y_verificable():
 
 
 def test_sin_sesion_redirige_y_con_sesion_entra(repo, persona, con_clave):
-    cliente = TestClient(crear_app(repo, PuenteQuieto()), base_url="https://rous.foor.dev")
+    cliente = TestClient(crear_app(repo, PuenteQuieto()), base_url="https://rous.majodelarous.dev")
     r = cliente.get("/control", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("/entrar")
     assert cliente.get("/control/estado").status_code == 401

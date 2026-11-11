@@ -1,6 +1,6 @@
 # Rous en AWS con Terraform
 
-Una instancia EC2 con Docker que corre el mismo `docker-compose.yml` que en la laptop, más Caddy para servir el panel por HTTPS en **https://rous.foor.dev/control** con contraseña. Todo lo crea y lo borra Terraform, incluido el registro DNS en Cloudflare.
+Una instancia EC2 con Docker que corre el mismo `docker-compose.yml` que en la laptop, más Caddy para servir el panel por HTTPS en **https://rous.majodelarous.dev/control** con contraseña. Todo lo crea y lo borra Terraform, incluido el registro DNS en Cloudflare.
 
 Qué se crea:
 
@@ -11,15 +11,15 @@ Qué se crea:
 | Grupo de seguridad | 22 solo desde tu IP; 80 y 443 abiertos para el panel |
 | Llave SSH | Tu llave pública de `~/.ssh` |
 | Rol de IAM | Session Manager (entrar aunque cambie tu IP) y permiso para Nova Sonic sin llaves en el `.env` |
-| Registro A en Cloudflare | `rous.foor.dev` hacia la IP fija, sin proxy. El `destroy` lo borra, así nunca queda una IP vieja |
+| Registro A en Cloudflare | `rous.majodelarous.dev` hacia la IP fija, sin proxy. El `destroy` lo borra, así nunca queda una IP vieja |
 
 El primer arranque instala Docker, pone la zona horaria de México, crea 2 GB de memoria de intercambio y clona el repositorio en `/opt/rous`. El `.env` no viaja en Terraform (quedaría en el estado); lo sube `desplegar.sh`.
 
 ## 0. Antes de empezar
 
-Requisitos en la laptop: Terraform 1.10 o posterior, AWS CLI con el perfil `Fortino-IAM-Admin` y una llave SSH (`ssh-keygen -t ed25519` si no tienes).
+Requisitos en la laptop: Terraform 1.10 o posterior, AWS CLI con un perfil configurado (variable `perfil_aws`) y una llave SSH (`ssh-keygen -t ed25519` si no tienes).
 
-Token de Cloudflare: en Cloudflare, Mi perfil, Tokens de API, Crear token, plantilla "Editar DNS de zona", con Recursos de zona: `foor.dev`. Antes de cada `plan`, `apply` o `destroy`:
+Token de Cloudflare: en Cloudflare, Mi perfil, Tokens de API, Crear token, plantilla "Editar DNS de zona", con Recursos de zona: `majodelarous.dev`. Antes de cada `plan`, `apply` o `destroy`:
 
 ```bash
 export CLOUDFLARE_API_TOKEN=...   # o guárdalo en tu gestor de contraseñas y cárgalo de ahí
@@ -29,7 +29,7 @@ No lo pongas en `terraform.tfvars` ni en el repositorio.
 
 El estado de Terraform queda local en `infra/terraform.tfstate` (está en `.gitignore`). Si después quieres un bucket para estados, copia `backend.tf.ejemplo` como `backend.tf` y corre `terraform init -migrate-state`.
 
-Contraseña del panel (la misma para Fortino y Majo):
+Contraseña del panel (la misma para todo el equipo):
 
 ```bash
 cd agente
@@ -57,7 +57,7 @@ Lo crea el `apply`. Si ya existía un registro `rous` hecho a mano, Terraform no
 terraform import cloudflare_dns_record.panel <id de la zona>/<id del registro>
 ```
 
-(los ids salen en `cf dns records list --zone foor.dev`). Si la zona tiene registros CAA, deben permitir `letsencrypt.org`.
+(los ids salen en `cf dns records list --zone majodelarous.dev`). Si la zona tiene registros CAA, deben permitir `letsencrypt.org`.
 
 ## 3. Subir el .env y levantar Rous
 
@@ -73,7 +73,7 @@ El script:
 
 ## 4. Abrir el panel
 
-**https://rous.foor.dev/control** desde la computadora o el teléfono, con la contraseña. Ahí está el QR para vincular el WhatsApp de la asistente y la guía de la demo en https://rous.foor.dev/guia.
+**https://rous.majodelarous.dev/control** desde la computadora o el teléfono, con la contraseña. Ahí está el QR para vincular el WhatsApp de la asistente y la guía de la demo en https://rous.majodelarous.dev/guia.
 
 Antes de vincular en el servidor, apaga el puente de la laptop y el de cualquier otra computadora: con dos sesiones Rous puede contestar doble.
 
@@ -113,7 +113,7 @@ scp ubuntu@$(terraform output -raw ip):/tmp/datos.tgz .
 
 | Qué pasa | Qué hacer |
 |---|---|
-| El navegador dice que el certificado no es válido | `dig +short rous.foor.dev` debe dar solo la IP de `terraform output -raw ip`. Si sale otra, borra ese registro en Cloudflare y reinicia Caddy: `ssh ... 'cd /opt/rous && docker compose restart caddy'` |
+| El navegador dice que el certificado no es válido | `dig +short rous.majodelarous.dev` debe dar solo la IP de `terraform output -raw ip`. Si sale otra, borra ese registro en Cloudflare y reinicia Caddy: `ssh ... 'cd /opt/rous && docker compose restart caddy'` |
 | "Panel cerrado: falta PANEL_CLAVE_HASH" | Agrega la línea al `.env` y corre `./desplegar.sh` |
 | "Demasiados intentos" | Espera 15 minutos, o reinicia el panel: `ssh ... 'cd /opt/rous && docker compose restart panel'` |
 | `ssh` se queda esperando | Cambió tu IP: actualiza `mi_ip` y `terraform apply`, o entra con `terraform output -raw sin_ssh` |
