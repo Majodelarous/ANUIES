@@ -115,3 +115,13 @@ async def test_espera_a_que_termine_de_sonar_el_audio_en_cola():
     assert espera >= 0.3 and g.paradas == antes + 1
     await tarea
     assert await g.esperar_fin_de_audio(g.paradas, max_s=0.2) < 1
+
+
+def test_quita_lo_que_tardo_en_empezar_a_hablar():
+    d = DetectorDeFin()
+    alimentar(d, [silencio()] * 50)  # 1 s del tonito (se ignora)
+    alimentar(d, [silencio()] * 75)  # 1.5 s pensando antes de hablar
+    alimentar(d, [voz()] * 50)  # 1 s hablando
+    assert alimentar(d, [silencio()] * 100)
+    # 0.3 s antes de la voz + 1 s de voz + 0.5 s al final
+    assert abs(len(d.audio()) / 2 / F - 1.8) < 0.15

@@ -42,6 +42,8 @@ class DetectorDeFin:
     ignorar_s: float = 1.0
     transcurrido: float = 0.0
     grabado: float = 0.0
+    # Segundos grabados antes de la primera palabra (lo que tardó en empezar a hablar)
+    antes_de_hablar: float = 0.0
     hablo: bool = False
     silencio: float = 0.0
     partes: list[bytes] = field(default_factory=list)
@@ -54,6 +56,8 @@ class DetectorDeFin:
         self.partes.append(pcm)
         self.grabado += segundos
         if energia(pcm) >= self.umbral:
+            if not self.hablo:
+                self.antes_de_hablar = self.grabado - segundos
             self.hablo = True
             self.silencio = 0.0
         else:
@@ -69,13 +73,17 @@ class DetectorDeFin:
         if not self.hablo:
             return None
         datos = b"".join(self.partes)
+        por_segundo = len(datos) / self.grabado if self.grabado else 0
         if self.partes and self.silencio > 0:
             # Quitar el silencio final, dejando medio segundo para que no suene cortado
-            por_segundo = len(datos) / self.grabado if self.grabado else 0
             sobra = max(0.0, self.silencio - 0.5)
             corte = int(por_segundo * sobra) // 2 * 2
             if 0 < corte < len(datos):
                 datos = datos[:-corte]
+        # Quitar lo que tardó en empezar a hablar, dejando 0.3 s antes de la primera palabra
+        inicio = int(por_segundo * max(0.0, self.antes_de_hablar - 0.3)) // 2 * 2
+        if 0 < inicio < len(datos):
+            datos = datos[inicio:]
         return datos
 
 
