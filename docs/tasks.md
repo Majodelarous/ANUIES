@@ -23,8 +23,8 @@
 
 ## Revisión pendiente
 
-- [x] Fortino revisó la rama `mejoras-prioritarias` (T18 versión 1, T21, T22, T23) en llamadas reales el 2026-11-03 y se unió a `main`. Se corrigió "recuérdame en 5 minutos" (se guardaba en hora UTC). La versión estable anterior queda en la etiqueta `v0.1-estable`.
-- [x] Fortino revisó la rama `ideas` (T19, T17, T16 y T16b) en llamadas reales el 2026-11-04 y se unió a `main`.
+- [x] Se revisó la rama `mejoras-prioritarias` (T18 versión 1, T21, T22, T23) en llamadas reales el 2026-11-03 y se unió a `main`. Se corrigió "recuérdame en 5 minutos" (se guardaba en hora UTC). La versión estable anterior queda en la etiqueta `v0.1-estable`.
+- [x] Se revisó la rama `ideas` (T19, T17, T16 y T16b) en llamadas reales el 2026-11-04 y se unió a `main`.
 - [ ] Investigar llamadas que se cuelgan solas a los 5 segundos de contestar (evento 44 sin audio de la persona): ¿red o motor de voz?
 
 ## Iteración 3: notificaciones y despliegue

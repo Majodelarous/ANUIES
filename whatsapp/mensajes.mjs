@@ -31,7 +31,7 @@ const sinAcentos = (texto) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
  */
 export const clasificarMensaje = ({ key, pushName, contenido }, grupoJid, prefijo = "abue") => {
   if (!key || key.fromMe || !grupoJid || key.remoteJid !== grupoJid || !contenido) return null;
-  // Solo el primer nombre: "Fortino Romero" queda "Fortino"
+  // Solo el primer nombre: "Ana López" queda "Ana"
   const de = (pushName || "Alguien de la familia").trim().split(/\s+/)[0].slice(0, 60);
   if (contenido.audioMessage) {
     return { tipo: "voz", de, segundos: Number(contenido.audioMessage.seconds || 0) };
